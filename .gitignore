@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+.netlify/
+.env
+public/scram/
+public/scramjet/
+public/controller/
+public/utils/
+public/baremod/
+public/epoxy/
+public/libcurl/

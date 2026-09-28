@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LucasProx — Minimalist Scramjet Proxy</title>
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23818cf8'/%3E%3Cstop offset='100%25' stop-color='%23c084fc'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='%2309090b'/%3E%3Cpath d='M18.5 5L8 18h7.5l-2 9L24 14h-7.5l2-9z' fill='url(%23g)'/%3E%3C/svg%3E"
+  />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="chrome" id="chrome">
+    <!-- Top Row: Brand + Minimalist Tab Strip + Window Controls -->
+    <div class="chrome__top">
+      <button
+        type="button"
+        class="brand-btn"
+        id="btn-brand"
+        aria-label="LucasProx Home"
+        title="Return to LucasProx Launchpad"
+      >
+        <svg class="brand-btn__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"
+            fill="url(#brand-grad)"
+            stroke="url(#brand-grad)"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <defs>
+            <linearGradient id="brand-grad" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#818cf8" />
+              <stop offset="1" stop-color="#c084fc" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="brand-btn__text">LucasProx</span>
+      </button>
+
+      <div class="tab-strip" id="tab-strip" role="tablist" aria-label="Open proxy tabs"></div>
+
+      <button
+        type="button"
+        class="icon-btn icon-btn--newtab"
+        id="btn-new-tab"
+        aria-label="New Tab"
+        title="New Tab (Ctrl+T / ⌘T)"
+      >
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path stroke-linecap="round" d="M10 4v12M4 10h12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Bottom Row: Navigation Controls + Omnibox + Quick Actions -->
+    <div class="chrome__bar">
+      <nav class="nav-controls" aria-label="Page navigation">
+        <button
+          type="button"
+          class="icon-btn"
+          id="btn-back"
+          aria-label="Go Back"
+          title="Back"
+          disabled
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12.5 15L7.5 10l5-5" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="icon-btn"
+          id="btn-forward"
+          aria-label="Go Forward"
+          title="Forward"
+          disabled
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 15l5-5-5-5" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="icon-btn"
+          id="btn-reload"
+          aria-label="Reload Page"
+          title="Reload"
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M16 10a6 6 0 1 1-1.76-4.24M16 4v3.5h-3.5"
+            />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="icon-btn"
+          id="btn-home"
+          aria-label="Toggle Launchpad"
+          title="Launchpad Home"
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M3.5 9.5L10 4l6.5 5.5v6a1 1 0 0 1-1 1h-3.5v-4.5h-4V16.5H4.5a1 1 0 0 1-1-1v-6z"
+            />
+          </svg>
+        </button>
+      </nav>
+
+      <form class="omnibox" id="omnibox-form" autocomplete="off">
+        <span class="omnibox__icon" id="omnibox-status-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+            <rect x="4.5" y="9" width="11" height="7.5" rx="2" />
+            <path stroke-linecap="round" d="M7 9V6.5a3 3 0 0 1 6 0V9" />
+          </svg>
+        </span>
+
+        <input
+          type="text"
+          id="address-input"
+          class="omnibox__input"
+          placeholder="Type any website URL or search anything..."
+          aria-label="Website URL or search query"
+          spellcheck="false"
+          autocapitalize="off"
+        />
+
+        <kbd class="omnibox__kbd" id="omnibox-kbd" aria-hidden="true">⌘K</kbd>
+
+        <button
+          type="submit"
+          class="omnibox__go"
+          aria-label="Go to URL"
+          title="Navigate"
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10h11m-4.5-4.5L15.5 10 11 14.5" />
+          </svg>
+        </button>
+      </form>
+
+      <div class="utility-controls">
+        <button
+          type="button"
+          class="icon-btn"
+          id="btn-cloak"
+          aria-label="Open in about:blank cloak"
+          title="Cloak in about:blank tab"
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M2.5 10s3-5.5 7.5-5.5S17.5 10 17.5 10s-3 5.5-7.5 5.5S2.5 10 2.5 10z"
+            />
+            <circle cx="10" cy="10" r="2.2" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="icon-btn"
+          id="btn-fullscreen"
+          aria-label="Toggle immersive fullscreen"
+          title="Immersive Fullscreen"
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M3.5 7.5V3.5h4M16.5 7.5V3.5h-4M3.5 12.5v4h4M16.5 12.5v4h-4"
+            />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="icon-btn"
+          id="btn-settings"
+          popovertarget="settings-popover"
+          aria-label="Proxy Settings"
+          title="Proxy Engine & Transport Settings"
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M4 6h12M4 10h12M4 14h12"
+            />
+            <circle cx="7" cy="6" r="1.6" fill="#09090b" />
+            <circle cx="13" cy="10" r="1.6" fill="#09090b" />
+            <circle cx="9" cy="14" r="1.6" fill="#09090b" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Animated Loading Bar -->
+    <div class="loading-bar" id="loading-bar" aria-hidden="true"></div>
+  </header>
+
+  <!-- Native Popover for Proxy Settings -->
+  <div id="settings-popover" class="settings-popover" popover="auto">
+    <div class="settings-popover__header">
+      <span class="settings-popover__title">LucasProx Engine</span>
+      <span class="settings-popover__badge" id="popover-engine-badge">Scramjet 2.0</span>
+    </div>
+
+    <div class="settings-group">
+      <label class="settings-label" for="select-transport">Proxy Transport Layer</label>
+      <select id="select-transport" class="settings-select">
+        <option value="bare">Bare V3 (HTTP Serverless — Netlify &amp; Universal)</option>
+        <option value="epoxy">Epoxy TLS (Rust/Wasm E2EE over Wisp)</option>
+        <option value="libcurl">Libcurl.js (C/Wasm TLS over Wisp)</option>
+      </select>
+    </div>
+
+    <div class="settings-group">
+      <label class="settings-label" for="select-search">Search Engine</label>
+      <select id="select-search" class="settings-select">
+        <option value="https://duckduckgo.com/?q=%s">DuckDuckGo (Default)</option>
+        <option value="https://search.brave.com/search?q=%s">Brave Search</option>
+        <option value="https://en.wikipedia.org/w/index.php?search=%s">Wikipedia</option>
+        <option value="https://www.bing.com/search?q=%s">Bing</option>
+      </select>
+    </div>
+
+    <div class="settings-actions">
+      <button type="button" class="settings-btn" id="btn-clear-data">
+        Clear Proxy Cache &amp; Cookies
+      </button>
+    </div>
+  </div>
+
+  <!-- Floating button to exit fullscreen mode -->
+  <button
+    type="button"
+    class="exit-fullscreen-btn"
+    id="btn-exit-fullscreen"
+    aria-label="Exit Fullscreen"
+    title="Show Top Bar (Esc)"
+    hidden
+  >
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M6 8l4 4 4-4" />
+    </svg>
+    <span>Show Bar</span>
+  </button>
+
+  <!-- Main Viewport -->
+  <main class="viewport" id="viewport">
+    <!-- Minimalistic Home Launchpad -->
+    <section class="launchpad" id="launchpad" aria-label="LucasProx Launchpad">
+      <div class="launchpad__glow" aria-hidden="true"></div>
+
+      <div class="launchpad__content">
+        <div class="status-pill" id="status-pill">
+          <span class="status-pill__dot" id="status-dot"></span>
+          <span id="status-text">Initializing Scramjet 2.0...</span>
+        </div>
+
+        <h1 class="launchpad__title">
+          Lucas<span class="launchpad__title-accent">Prox</span>
+        </h1>
+        <p class="launchpad__subtitle">
+          Minimalist, unrestricted web proxy powered by Scramjet &amp; Wisp.
+        </p>
+
+        <form class="hero-search" id="hero-form" autocomplete="off">
+          <span class="hero-search__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="7" />
+              <path stroke-linecap="round" d="M20 20l-3.5-3.5" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            id="hero-input"
+            class="hero-search__input"
+            placeholder="Enter any website (e.g. wikipedia.org, news.ycombinator.com) or search..."
+            aria-label="Enter website URL or search query"
+            spellcheck="false"
+            autocapitalize="off"
+            autofocus
+          />
+          <button type="submit" class="hero-search__btn">
+            <span>Launch</span>
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10h11m-4.5-4.5L15.5 10 11 14.5" />
+            </svg>
+          </button>
+        </form>
+
+        <div class="quick-links" aria-label="Quick launch websites">
+          <button type="button" class="quick-card" data-url="https://duckduckgo.com">
+            <span class="quick-card__icon" style="--card-accent: #f97316">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="11" cy="11" r="7" />
+                <path stroke-linecap="round" d="M20 20l-3.5-3.5" />
+              </svg>
+            </span>
+            <span class="quick-card__meta">
+              <span class="quick-card__name">DuckDuckGo</span>
+              <span class="quick-card__domain">duckduckgo.com</span>
+            </span>
+          </button>
+
+          <button type="button" class="quick-card" data-url="https://www.wikipedia.org">
+            <span class="quick-card__icon" style="--card-accent: #e2e8f0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6l4 12 4-9 4 9 4-12" />
+              </svg>
+            </span>
+            <span class="quick-card__meta">
+              <span class="quick-card__name">Wikipedia</span>
+              <span class="quick-card__domain">wikipedia.org</span>
+            </span>
+          </button>
+
+          <button type="button" class="quick-card" data-url="https://news.ycombinator.com">
+            <span class="quick-card__icon" style="--card-accent: #fb923c">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 5l5 7 5-7M12 12v7" />
+              </svg>
+            </span>
+            <span class="quick-card__meta">
+              <span class="quick-card__name">Hacker News</span>
+              <span class="quick-card__domain">news.ycombinator.com</span>
+            </span>
+          </button>
+
+          <button type="button" class="quick-card" data-url="https://old.reddit.com">
+            <span class="quick-card__icon" style="--card-accent: #f43f5e">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="13" r="7" />
+                <circle cx="9.5" cy="12" r="1" fill="currentColor" />
+                <circle cx="14.5" cy="12" r="1" fill="currentColor" />
+                <path stroke-linecap="round" d="M9.5 15.5c1.5 1 3.5 1 5 0M12 6l2-3 3 1" />
+              </svg>
+            </span>
+            <span class="quick-card__meta">
+              <span class="quick-card__name">Reddit</span>
+              <span class="quick-card__domain">old.reddit.com</span>
+            </span>
+          </button>
+
+          <button type="button" class="quick-card" data-url="https://developer.mozilla.org">
+            <span class="quick-card__icon" style="--card-accent: #38bdf8">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12" />
+              </svg>
+            </span>
+            <span class="quick-card__meta">
+              <span class="quick-card__name">MDN Docs</span>
+              <span class="quick-card__domain">developer.mozilla.org</span>
+            </span>
+          </button>
+
+          <button type="button" class="quick-card" data-url="https://archive.org">
+            <span class="quick-card__icon" style="--card-accent: #a78bfa">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M5 10v8M9 10v8M15 10v8M19 10v8M3 18h18M12 4l9 4H3l9-4z" />
+              </svg>
+            </span>
+            <span class="quick-card__meta">
+              <span class="quick-card__name">Internet Archive</span>
+              <span class="quick-card__domain">archive.org</span>
+            </span>
+          </button>
+
+          <button type="button" class="quick-card" data-url="https://www.openstreetmap.org">
+            <span class="quick-card__icon" style="--card-accent: #34d399">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="8" />
+                <path stroke-linecap="round" d="M4 12h16M12 4a12 12 0 0 1 0 16M12 4a12 12 0 0 0 0 16" />
+              </svg>
+            </span>
+            <span class="quick-card__meta">
+              <span class="quick-card__name">OpenStreetMap</span>
+              <span class="quick-card__domain">openstreetmap.org</span>
+            </span>
+          </button>
+
+          <button type="button" class="quick-card" data-url="https://example.com">
+            <span class="quick-card__icon" style="--card-accent: #818cf8">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" />
+              </svg>
+            </span>
+            <span class="quick-card__meta">
+              <span class="quick-card__name">Example Test</span>
+              <span class="quick-card__domain">example.com</span>
+            </span>
+          </button>
+        </div>
+
+        <footer class="launchpad__footer">
+          <span class="footer-chip">
+            <strong>Engine:</strong> Scramjet 2.0 Wasm Rewriter
+          </span>
+          <span class="footer-sep" aria-hidden="true">•</span>
+          <span class="footer-chip" id="footer-transport">
+            <strong>Transport:</strong> Epoxy TLS / Wisp v2
+          </span>
+          <span class="footer-sep" aria-hidden="true">•</span>
+          <span class="footer-chip" id="footer-isolation">
+            <strong>Isolation:</strong> COOP/COEP
+          </span>
+        </footer>
+      </div>
+    </section>
+
+    <!-- Proxied Iframe Container -->
+    <div class="frames-stage" id="frames-stage"></div>
+  </main>
+
+  <!-- Scramjet 2.x Runtime Scripts (Must load in strict sequence before app.js) -->
+  <script src="/scram/scramjet.js"></script>
+  <script src="/controller/controller.api.js"></script>
+  <script src="/utils/scramjet-utils.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
