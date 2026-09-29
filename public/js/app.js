@@ -214,8 +214,15 @@ class HardenedBareTransport {
 
   constructor(serverUrl) {
     const primary = new URL("./v3/", serverUrl);
-    const fallback = new URL("/.netlify/functions/bare/v3/", location.origin);
-    this.endpoints = isLocalhost ? [primary.href] : [primary.href, fallback.href];
+    const vercelApi = new URL("/api/bare", location.origin);
+    const netlifyFn = new URL("/.netlify/functions/bare/v3/", location.origin);
+    const isVercel = location.hostname.endsWith(".vercel.app");
+
+    this.endpoints = isLocalhost
+      ? [primary.href]
+      : isVercel
+      ? [vercelApi.href, primary.href]
+      : [primary.href, vercelApi.href, netlifyFn.href];
     this.activeEndpointIndex = 0;
 
     const wsUrl = new URL(primary.href);
