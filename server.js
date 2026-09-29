@@ -42,12 +42,9 @@ app.get("/api/status", (_req, res) => {
   });
 });
 
-// Serve static files from public/
-app.use(express.static(publicDir));
-
 /**
  * Extract target origin from Referer header or __lp_origin cookie
- * so root-relative requests (/_next/..., /assets/..., /static/...) from proxied sites
+ * so root-relative requests (/_next/..., /assets/..., /static/..., /?q=...) from proxied sites
  * are automatically proxied instead of hitting the SPA index.html fallback!
  */
 function extractProxiedOrigin(req) {
@@ -76,6 +73,27 @@ function extractProxiedOrigin(req) {
 
   return null;
 }
+
+// Intercept root search/form navigations (e.g. /?q=...&ia=web from DuckDuckGo or Google inside an iframe)
+// BEFORE express.static serves public/index.html!
+app.get("/", (req, res, next) => {
+  const hasSearchQuery =
+    req.query &&
+    Object.keys(req.query).length > 0 &&
+    req.query.url === undefined;
+  const isIframeDest = req.headers["sec-fetch-dest"] === "iframe";
+  if (hasSearchQuery && (isIframeDest || req.query.q !== undefined || req.query.ia !== undefined)) {
+    const targetOrigin = extractProxiedOrigin(req) || "https://duckduckgo.com";
+    const resolvedUrl = `${targetOrigin}${req.originalUrl}`;
+    req.url = `/api/proxy?engine=uv&url=${encodeURIComponent(resolvedUrl)}`;
+    void proxyHandler(req, res);
+    return;
+  }
+  next();
+});
+
+// Serve static files from public/
+app.use(express.static(publicDir));
 
 app.all("*", (req, res) => {
   if (req.path !== "/" && req.path !== "/index.html") {

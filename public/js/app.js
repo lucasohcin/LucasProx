@@ -837,9 +837,13 @@ class HardenedBareTransport {
     }
 
     const normalizedHeaders = this.normalizeResponseHeaders(parsedBareHeaders);
+    const bodyBuffer =
+      status === 101 || status === 204 || status === 205 || status === 304
+        ? new ArrayBuffer(0)
+        : await response.arrayBuffer();
 
     return {
-      body: response.body || new ArrayBuffer(0),
+      body: bodyBuffer,
       headers: normalizedHeaders,
       status,
       statusText,
@@ -1022,7 +1026,7 @@ function createPageLifecyclePlugin(onTitle, onReady, onError) {
     install(frame) {
       super.install(frame);
 
-      this.tap(frame.hooks.fetch.response, (_ctx, state) => {
+      this.tap(frame.hooks.fetch.response, async (_ctx, state) => {
         if (!state?.response) return;
         const res = state.response;
         res.statusText =
@@ -1033,6 +1037,13 @@ function createPageLifecyclePlugin(onTitle, onReady, onError) {
           res.headers.delete("content-encoding");
           res.headers.delete("content-length");
           res.headers.delete("transfer-encoding");
+        }
+        if (typeof ReadableStream !== "undefined" && res.body instanceof ReadableStream) {
+          try {
+            res.body = await new Response(res.body).arrayBuffer();
+          } catch {
+            res.body = new ArrayBuffer(0);
+          }
         }
       });
 
@@ -1279,8 +1290,7 @@ async function ensureTabScramjetFrame(tab) {
   if (tab.sjFrame) return tab.sjFrame;
 
   const ctrl = await ensureEngineReady();
-  const { UrlWatcherPlugin, CatchEscapedLinksPlugin } =
-    globalThis.$scramjetUtils;
+  const { UrlWatcherPlugin } = globalThis.$scramjetUtils;
 
   const urlWatcher = new UrlWatcherPlugin((newUrl) => {
     recordTabUrl(tab, newUrl);
@@ -1289,11 +1299,6 @@ async function ensureTabScramjetFrame(tab) {
     }
     renderUI();
   });
-
-  const escapedLinks = new CatchEscapedLinksPlugin(
-    (escapedUrl) =>
-      new URL(`/?url=${encodeURIComponent(escapedUrl.href)}`, location.origin)
-  );
 
   const lifecycle = createPageLifecyclePlugin(
     (newTitle) => {
@@ -1314,7 +1319,7 @@ async function ensureTabScramjetFrame(tab) {
   );
 
   tab.sjFrame = ctrl.createFrame(tab.iframe, {
-    plugins: [sharedHttpCache, urlWatcher, escapedLinks, lifecycle],
+    plugins: [urlWatcher, lifecycle],
   });
 
   return tab.sjFrame;
@@ -1339,6 +1344,24 @@ function shouldDirectEmbedInAuto(urlStr) {
   try {
     const host = new URL(urlStr).hostname.toLowerCase();
     return DIRECT_EMBED_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
+  } catch {
+    return false;
+  }
+}
+
+const AST_WASM_DOMAINS = [
+  "xbox.com",
+  "xboxservices.com",
+  "gamepass.com",
+  "discord.com",
+  "geforcenow.com",
+  "now.gg",
+];
+
+function shouldUseWasmInAuto(urlStr) {
+  try {
+    const host = new URL(urlStr).hostname.toLowerCase();
+    return AST_WASM_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
   } catch {
     return false;
   }
@@ -1443,14 +1466,16 @@ async function navigateTo(
     return;
   }
 
-  // In Auto mode or Proxy 1: use Scramjet Wasm Service Worker (full AST JS/HTML/Cookie/Worker virtualization)
-  // so complex anti-proxy sites like Xbox Cloud Gaming, Discord, YouTube, and Poki are 100% undetectable!
-  if (engineToUse === "auto" || engineToUse === "scramjet") {
+  // Use Scramjet Wasm Service Worker when Proxy 1 is selected or in Auto mode for heavy AST-virtualized apps (Xbox, Discord, etc.)
+  if (
+    engineToUse === "scramjet" ||
+    (engineToUse === "auto" && shouldUseWasmInAuto(targetUrl))
+  ) {
     try {
       const sjFrame = await Promise.race([
         ensureTabScramjetFrame(targetTab),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("SW timeout")), 6000)
+          setTimeout(() => reject(new Error("SW timeout")), 4500)
         ),
       ]);
       logNetworkEvent("GET", targetUrl, engineToUse);
@@ -1465,8 +1490,8 @@ async function navigateTo(
     }
   }
 
-  // In Proxy 2 / Proxy 3 / Proxy 4 / Reader:
-  // Route via server-rewritten proxy with escaped-asset recovery
+  // In Auto mode (for search engines & standard web) and Proxy 2 / Proxy 3 / Proxy 4 / Reader:
+  // Route immediately via server-rewritten proxy with escaped-asset & form recovery
   resetTabIframeIfHooked(targetTab);
   const effectiveEngine = engineToUse === "auto" ? "uv" : engineToUse;
   const serverSrc = buildServerEngineIframeSrc(targetUrl, effectiveEngine);

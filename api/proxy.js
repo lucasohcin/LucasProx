@@ -364,12 +364,53 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
     );
   }
 
+  function uvDecode(str) {
+    if (!str) return "";
+    try {
+      const raw = decodeURIComponent(String(str));
+      return raw.split("").map((ch, idx) => idx % 2 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch).join("");
+    } catch {
+      return "";
+    }
+  }
+
+  function unwrapUrl(raw) {
+    if (!raw) return raw;
+    const s = String(raw).trim();
+    try {
+      let pathAndQuery = s;
+      if (s.startsWith(location.origin + "/")) {
+        pathAndQuery = s.slice(location.origin.length);
+      }
+      if (pathAndQuery.startsWith("/service/uv/")) {
+        const u = new URL(pathAndQuery, location.origin);
+        const encodedPart = u.pathname.slice("/service/uv/".length);
+        const decoded = uvDecode(encodedPart);
+        if (/^https?:\/\//i.test(decoded)) {
+          const target = new URL(decoded);
+          for (const [k, v] of u.searchParams.entries()) {
+            if (k !== "adblock" && k !== "engine") {
+              target.searchParams.set(k, v);
+            }
+          }
+          return target.href;
+        }
+      }
+      if (pathAndQuery.startsWith("/api/proxy")) {
+        const u = new URL(pathAndQuery, location.origin);
+        const inner = u.searchParams.get("url");
+        if (inner) return inner;
+      }
+    } catch {}
+    return raw;
+  }
+
   function resolveAgainstTarget(raw, base) {
-    const s = String(raw || "").trim();
+    const s = String(unwrapUrl(raw) || "").trim();
     if (!s) return CFG.baseUrl;
     if (s.startsWith("//")) return TARGET_URL.protocol + s;
     if (s.startsWith("/")) return TARGET_URL.origin + s;
-    const resolved = new URL(s, base || CFG.baseUrl).href;
+    const resolved = new URL(s, unwrapUrl(base) || CFG.baseUrl).href;
     if (resolved.startsWith(location.origin + "/")) {
       const subPath = resolved.slice(location.origin.length);
       if (!subPath.startsWith("/api/") && !subPath.startsWith("/service/")) {
@@ -420,12 +461,7 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
     try {
       if (url !== undefined && url !== null && String(url) !== "") {
         const rawStr = String(url);
-        let nextTarget;
-        if (rawStr.startsWith("/service/uv/")) {
-          nextTarget = TARGET_URL;
-        } else {
-          nextTarget = new URL(resolveAgainstTarget(rawStr, CFG.baseUrl));
-        }
+        const nextTarget = new URL(resolveAgainstTarget(rawStr, CFG.baseUrl));
         CFG.baseUrl = nextTarget.href;
         TARGET_URL = nextTarget;
         const cleanPath = (nextTarget.pathname || "/") + (nextTarget.search || "") + (nextTarget.hash || "");
@@ -446,8 +482,9 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
     return handleSpaStateChange(origReplaceState, state, title, url);
   };
 
-  // Intercept setAttribute for dynamic scripts, images, links, iframes
+  // Intercept setAttribute and getAttribute so bundlers (Turbopack, Webpack, Next.js) see original URLs
   const origSetAttr = Element.prototype.setAttribute;
+  const origGetAttr = Element.prototype.getAttribute;
   Element.prototype.setAttribute = function(name, value) {
     const lower = String(name || "").toLowerCase();
     if (lower === "integrity" || lower === "crossorigin" || lower === "nonce") {
@@ -458,14 +495,24 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
     }
     return origSetAttr.call(this, name, value);
   };
+  Element.prototype.getAttribute = function(name) {
+    const val = origGetAttr.call(this, name);
+    const lower = String(name || "").toLowerCase();
+    if (val && (lower === "src" || lower === "href" || lower === "action")) {
+      return unwrapUrl(val);
+    }
+    return val;
+  };
 
-  // Intercept direct .src and .href property assignments on DOM elements
+  // Intercept direct .src, .href, and .action property assignments and getters on DOM elements
   function hookUrlProperty(Proto, prop) {
     if (!Proto || !Proto.prototype) return;
     const desc = Object.getOwnPropertyDescriptor(Proto.prototype, prop);
-    if (!desc || !desc.set) return;
+    if (!desc || !desc.set || !desc.get) return;
     Object.defineProperty(Proto.prototype, prop, {
-      get: desc.get,
+      get() {
+        return unwrapUrl(desc.get.call(this));
+      },
       set(val) {
         desc.set.call(this, wrapUrl(val, CFG.baseUrl));
       },
@@ -479,6 +526,8 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
   hookUrlProperty(window.HTMLIFrameElement, "src");
   hookUrlProperty(window.HTMLMediaElement, "src");
   hookUrlProperty(window.HTMLSourceElement, "src");
+  hookUrlProperty(window.HTMLFormElement, "action");
+  hookUrlProperty(window.HTMLAnchorElement, "href");
 
   // Notify parent frame of URL and Title
   function notifyParent() {
@@ -578,36 +627,98 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
     return origWinOpen ? origWinOpen.apply(this, arguments) : null;
   };
 
-  // Intercept link clicks and form submissions
-  document.addEventListener("click", function(e) {
-    const anchor = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+  function submitFormThroughProxy(form) {
+    if (!form || form.tagName !== "FORM") return false;
+    const method = (form.method || "GET").toUpperCase();
+    const rawAction = origGetAttr.call(form, "action") || CFG.baseUrl;
+    const resolvedAction = resolveAgainstTarget(rawAction, CFG.baseUrl);
+    if (method === "GET") {
+      const targetUrl = new URL(resolvedAction);
+      const fd = new FormData(form);
+      for (const [k, v] of fd.entries()) {
+        if (typeof v === "string") {
+          targetUrl.searchParams.set(k, v);
+        }
+      }
+      location.href = wrapUrl(targetUrl.href, CFG.baseUrl);
+      return true;
+    } else {
+      origSetAttr.call(form, "action", wrapUrl(resolvedAction, CFG.baseUrl));
+      return false;
+    }
+  }
+
+  // Hook programmatic form.submit() and form.requestSubmit()
+  if (window.HTMLFormElement) {
+    const origFormSubmit = HTMLFormElement.prototype.submit;
+    HTMLFormElement.prototype.submit = function() {
+      if (submitFormThroughProxy(this)) return;
+      return origFormSubmit.call(this);
+    };
+    if (HTMLFormElement.prototype.requestSubmit) {
+      const origReqSubmit = HTMLFormElement.prototype.requestSubmit;
+      HTMLFormElement.prototype.requestSubmit = function(submitter) {
+        if (submitFormThroughProxy(this)) return;
+        return origReqSubmit.call(this, submitter);
+      };
+    }
+  }
+
+  // Capture-phase Enter key handler on search inputs/textareas (e.g. DuckDuckGo <textarea name="q">)
+  window.addEventListener("keydown", function(e) {
+    if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+    const el = e.target;
+    if (!el || !el.closest) return;
+    const form = el.closest("form");
+    if (!form) return;
+    const tag = (el.tagName || "").toUpperCase();
+    const isSearchField =
+      (tag === "TEXTAREA" && (el.name === "q" || el.getAttribute("enterKeyHint") === "search" || form.getAttribute("role") === "search")) ||
+      (tag === "INPUT" && (el.type === "search" || el.type === "text" || !el.type));
+    if (isSearchField && (form.method || "GET").toUpperCase() === "GET") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      submitFormThroughProxy(form);
+    }
+  }, true);
+
+  // Intercept link clicks and search submit button clicks in capture phase on window
+  window.addEventListener("click", function(e) {
+    const target = e.target;
+    if (!target || !target.closest) return;
+
+    const submitBtn = target.closest('button[type="submit"], input[type="submit"], form[role="search"] button:not([type])');
+    if (submitBtn) {
+      const form = submitBtn.form || submitBtn.closest("form");
+      if (form && (form.method || "GET").toUpperCase() === "GET") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        submitFormThroughProxy(form);
+        return;
+      }
+    }
+
+    const anchor = target.closest("a[href]");
     if (!anchor) return;
-    const rawHref = anchor.getAttribute("href");
+    const rawHref = origGetAttr.call(anchor, "href");
     if (!rawHref || rawHref.startsWith("#") || rawHref.startsWith("javascript:")) return;
     if (anchor.target === "_blank" || anchor.target === "_top" || anchor.target === "_parent") {
       anchor.removeAttribute("target");
     }
-    if (!rawHref.startsWith("/api/proxy") && !rawHref.startsWith("/service/uv/")) {
-      e.preventDefault();
-      location.href = wrapUrl(rawHref, CFG.baseUrl);
-    }
+    e.preventDefault();
+    location.href = wrapUrl(unwrapUrl(rawHref), CFG.baseUrl);
   }, true);
 
-  document.addEventListener("submit", function(e) {
+  window.addEventListener("submit", function(e) {
     const form = e.target;
     if (!form || form.tagName !== "FORM") return;
     const method = (form.method || "GET").toUpperCase();
-    const rawAction = form.getAttribute("action") || CFG.baseUrl;
     if (method === "GET") {
       e.preventDefault();
-      const targetUrl = new URL(resolveAgainstTarget(rawAction, CFG.baseUrl));
-      const fd = new FormData(form);
-      for (const [k, v] of fd.entries()) {
-        targetUrl.searchParams.set(k, String(v));
-      }
-      location.href = wrapUrl(targetUrl.href, CFG.baseUrl);
-    } else if (!rawAction.startsWith("/api/proxy") && !rawAction.startsWith("/service/uv/")) {
-      form.action = wrapUrl(rawAction, CFG.baseUrl);
+      e.stopImmediatePropagation();
+      submitFormThroughProxy(form);
+    } else {
+      submitFormThroughProxy(form);
     }
   }, true);
 })();
@@ -627,6 +738,16 @@ function rewriteHtml(htmlText, finalUrl, engine, adblock) {
   output = output.replace(/\sintegrity\s*=\s*(['"])[^'"]*\1/gi, "");
   output = output.replace(/\scrossorigin(?:\s*=\s*(['"])[^'"]*\1)?/gi, "");
   output = output.replace(/\snonce\s*=\s*(['"])[^'"]*\1/gi, "");
+
+  // When a page provides <script nomodule> classic bundles alongside <script type="module"> (e.g. DuckDuckGo SERP),
+  // prefer the classic bundle so relative ES module sub-imports aren't needed
+  if (/<script\b[^>]*\bnomodule\b/i.test(output)) {
+    output = output.replace(
+      /<script\b[^>]*\btype\s*=\s*(['"]?)module\1[^>]*>\s*<\/script>/gi,
+      ""
+    );
+    output = output.replace(/\s+nomodule(?:\s*=\s*(['"])[^'"]*\1)?/gi, "");
+  }
 
   // Protect inline <script> bodies (e.g., Next.js __NEXT_DATA__ JSON blobs) from HTML attribute regex corruption
   const scriptBlocks = [];
@@ -889,11 +1010,41 @@ export default async function proxyHandler(req, res) {
     const adblock = reqUrl.searchParams.get("adblock") === "1";
 
     let rawTarget = reqUrl.searchParams.get("url") || "";
+    const isUvRoute = !rawTarget && reqUrl.pathname.startsWith("/service/uv/");
 
-    if (!rawTarget && reqUrl.pathname.startsWith("/service/uv/")) {
+    if (isUvRoute) {
       engine = "uv";
       const encodedPart = reqUrl.pathname.slice("/service/uv/".length);
-      rawTarget = uvDecode(encodedPart);
+      const decoded = uvDecode(encodedPart);
+      if (/^https?:\/\//i.test(decoded)) {
+        rawTarget = decoded;
+      } else {
+        // Relative module/asset resolved by browser against /service/uv/<encodedParent>
+        let baseHref = "";
+        const ref = req.headers.referer || "";
+        if (ref) {
+          try {
+            const refUrl = new URL(ref);
+            if (refUrl.pathname.startsWith("/service/uv/")) {
+              const refDecoded = uvDecode(refUrl.pathname.slice("/service/uv/".length));
+              if (/^https?:\/\//i.test(refDecoded)) {
+                baseHref = refDecoded;
+              }
+            } else if (refUrl.pathname.startsWith("/api/proxy")) {
+              baseHref = refUrl.searchParams.get("url") || "";
+            }
+          } catch {}
+        }
+        if (!baseHref && req.headers.cookie) {
+          const m = String(req.headers.cookie).match(/(?:^|;\s*)__lp_origin=([^;]+)/);
+          if (m && m[1]) {
+            try {
+              baseHref = decodeURIComponent(m[1]);
+            } catch {}
+          }
+        }
+        rawTarget = baseHref ? new URL(encodedPart, baseHref).href : decoded;
+      }
     }
 
     if (!rawTarget) {
@@ -908,6 +1059,15 @@ export default async function proxyHandler(req, res) {
       targetUrl = new URL(rawTarget);
     } catch {
       targetUrl = new URL(`https://${rawTarget}`);
+    }
+
+    // Preserve GET form and search query parameters appended to /service/uv/...
+    if (isUvRoute) {
+      for (const [k, v] of reqUrl.searchParams.entries()) {
+        if (k !== "adblock" && k !== "engine") {
+          targetUrl.searchParams.set(k, v);
+        }
+      }
     }
 
     if (adblock && isBlockedDomain(targetUrl.hostname)) {
