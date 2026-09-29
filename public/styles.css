@@ -111,9 +111,11 @@ html,
 body {
   margin: 0;
   padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
   background: var(--bg-deep);
   color: var(--text-primary);
   font-family: var(--font-ui);
@@ -161,12 +163,16 @@ html[data-bg="custom"] .ambient-glow {
 }
 
 .app-shell {
-  position: relative;
+  position: fixed !important;
+  inset: 0 !important;
   z-index: 1;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
 }
 
 /* Google Chrome Top Bar */
@@ -670,13 +676,14 @@ html[data-density="compact"] .chrome-nav {
 
 /* Main Viewport */
 .viewport {
-  position: relative;
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  position: relative !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: calc(100vh - 122px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
 }
 
 /* Chill Google Chrome-Style New Tab Page */
@@ -1633,27 +1640,44 @@ body.is-fullscreen .chrome-bar {
   padding: 20px 0 8px;
 }
 
-/* Tiny Bottom Google AdSense Bar */
-.bottom-ad-bar {
-  position: relative;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  height: 54px;
-  min-height: 54px;
-  padding: 2px 12px;
-  background: var(--bg-chrome, rgba(14, 15, 22, 0.94));
-  border-top: 1px solid var(--border-subtle);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.bottom-ad-bar[hidden] {
+/* Block Google Auto Ads from injecting random layout-breaking banners into the browser UI */
+.google-auto-placed,
+.adsbygoogle-noablate,
+body > ins.adsbygoogle,
+.app-shell ins.adsbygoogle {
   display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
 }
 
+/* Tiny Non-Intrusive Floating Google AdSense Pill */
+.bottom-ad-bar {
+  position: fixed !important;
+  left: 12px !important;
+  bottom: 10px !important;
+  z-index: 25;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  height: 52px !important;
+  min-height: 52px !important;
+  max-height: 52px !important;
+  width: auto !important;
+  max-width: 380px !important;
+  padding: 2px 30px 2px 8px;
+  border-radius: 10px;
+  background: rgba(12, 14, 22, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden !important;
+}
+
+.bottom-ad-bar[hidden],
+.bottom-ad-bar:has(ins[data-ad-status="unfilled"]),
 body.is-fullscreen .bottom-ad-bar {
   display: none !important;
 }
@@ -1675,20 +1699,30 @@ body.is-fullscreen .bottom-ad-bar {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 50px;
-  max-height: 50px;
-  width: 100%;
-  max-width: 728px;
-  overflow: hidden;
+  height: 50px !important;
+  max-height: 50px !important;
+  width: 320px !important;
+  max-width: 320px !important;
+  overflow: hidden !important;
+  border-radius: 6px;
+}
+
+.bottom-ad-bar__slot ins.adsbygoogle {
+  display: inline-block !important;
+  width: 320px !important;
+  height: 50px !important;
+  max-width: 320px !important;
+  max-height: 50px !important;
+  overflow: hidden !important;
 }
 
 .bottom-ad-bar__close {
   position: absolute;
-  right: 10px;
+  right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 6px;
   border: 1px solid transparent;
   background: transparent;
@@ -1702,7 +1736,7 @@ body.is-fullscreen .bottom-ad-bar {
 }
 
 .bottom-ad-bar__close:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
   border-color: var(--border-subtle);
 }

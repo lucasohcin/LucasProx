@@ -253,7 +253,9 @@ const loadingBarEl = document.getElementById("loading-bar");
 
 // LucasBrowse Native Search View DOM
 const lbSearchViewEl = document.getElementById("lb-search-view");
-const lbSearchLogoBtn = document.getElementById("lb-search-logo");
+const lbSearchLogoBtn =
+  document.getElementById("lb-search-home-btn") ||
+  document.getElementById("lb-search-logo");
 const lbSearchForm = document.getElementById("lb-search-form");
 const lbSearchInput = document.getElementById("lb-search-input");
 const lbSearchTabsEl = document.getElementById("lb-search-tabs");
@@ -2668,7 +2670,7 @@ lbSearchLogoBtn?.addEventListener("click", () => {
 
 lbSearchTabsEl?.querySelectorAll(".lb-search-tab").forEach((btn) => {
   btn.addEventListener("click", () => {
-    currentSearchFilter = btn.dataset.searchTab || "all";
+    currentSearchFilter = btn.dataset.lbtab || btn.dataset.searchTab || "all";
     lbSearchTabsEl.querySelectorAll(".lb-search-tab").forEach((b) => {
       b.classList.toggle("is-active", b === btn);
     });
@@ -3134,7 +3136,61 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
+/**
+ * Guard against Google AdSense Auto Ads mutating parent heights or injecting layout-breaking banners
+ */
+function installAdSenseLayoutGuard() {
+  const protectedEls = [
+    document.documentElement,
+    document.body,
+    document.querySelector(".app-shell"),
+    document.querySelector(".chrome-bar"),
+    document.getElementById("viewport"),
+    launchpadEl,
+    framesStageEl,
+    document.getElementById("bottom-ad-bar"),
+    document.querySelector(".bottom-ad-bar__slot"),
+  ].filter(Boolean);
+
+  const cleanLayoutMutations = () => {
+    for (const el of protectedEls) {
+      if (el.style?.height) el.style.removeProperty("height");
+      if (el.style?.minHeight) el.style.removeProperty("min-height");
+      if (el.style?.maxHeight) el.style.removeProperty("max-height");
+      if (el.style?.paddingBottom) el.style.removeProperty("padding-bottom");
+      if (el.style?.paddingTop) el.style.removeProperty("padding-top");
+    }
+
+    // Remove any random Auto Ads placements injected outside our tiny corner ad pill
+    document
+      .querySelectorAll(
+        ".google-auto-placed, .adsbygoogle-noablate, ins.adsbygoogle:not(#lucasbrowse-ad-unit)"
+      )
+      .forEach((node) => node.remove());
+
+    // Hide the corner ad pill if AdSense reports unfilled
+    const adUnit = document.getElementById("lucasbrowse-ad-unit");
+    const adBar = document.getElementById("bottom-ad-bar");
+    if (adUnit && adBar) {
+      const status = adUnit.getAttribute("data-ad-status");
+      if (status === "unfilled") {
+        adBar.hidden = true;
+      }
+    }
+  };
+
+  cleanLayoutMutations();
+  const observer = new MutationObserver(cleanLayoutMutations);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["style", "data-ad-status"],
+    childList: true,
+    subtree: true,
+  });
+}
+
 // Boot Initial State
+installAdSenseLayoutGuard();
 applyCustomizationsFromStorage();
 renderBookmarks();
 renderShortcuts();

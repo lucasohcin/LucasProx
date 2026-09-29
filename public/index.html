@@ -459,34 +459,6 @@
         </aside>
       </main>
 
-      <!-- Tiny Bottom Google AdSense Banner -->
-      <footer class="bottom-ad-bar" id="bottom-ad-bar" aria-label="Sponsored Advertisement">
-        <span class="bottom-ad-bar__label">Sponsored</span>
-        <div class="bottom-ad-bar__slot">
-          <ins
-            class="adsbygoogle"
-            style="display:inline-block;width:728px;height:50px;max-width:100%"
-            data-ad-client="ca-pub-8809409643138652"
-            data-ad-format="horizontal"
-            data-full-width-responsive="false"
-          ></ins>
-          <script>
-            try {
-              (window.adsbygoogle = window.adsbygoogle || []).push({});
-            } catch (e) {}
-          </script>
-        </div>
-        <button
-          type="button"
-          class="bottom-ad-bar__close"
-          onclick="document.getElementById('bottom-ad-bar').hidden = true"
-          title="Hide banner"
-          aria-label="Hide banner"
-        >
-          ✕
-        </button>
-      </footer>
-
       <!-- Floating Fullscreen Exit Button -->
       <button
         type="button"
@@ -498,6 +470,34 @@
         Exit Fullscreen
       </button>
     </div>
+
+    <!-- Tiny Non-Intrusive Floating Google AdSense Pill (Isolated outside app-shell so Auto Ads cannot scrunch the UI) -->
+    <aside class="bottom-ad-bar" id="bottom-ad-bar" aria-label="Sponsored">
+      <span class="bottom-ad-bar__label">Ad</span>
+      <div class="bottom-ad-bar__slot">
+        <ins
+          id="lucasbrowse-ad-unit"
+          class="adsbygoogle"
+          style="display:inline-block;width:320px;height:50px"
+          data-ad-client="ca-pub-8809409643138652"
+          data-full-width-responsive="false"
+        ></ins>
+        <script>
+          try {
+            (window.adsbygoogle = window.adsbygoogle || []).push({});
+          } catch (e) {}
+        </script>
+      </div>
+      <button
+        type="button"
+        class="bottom-ad-bar__close"
+        onclick="document.getElementById('bottom-ad-bar').remove()"
+        title="Dismiss ad"
+        aria-label="Dismiss ad"
+      >
+        ✕
+      </button>
+    </aside>
 
     <!-- Games Hub Modal (1,400+ Free Instant-Play 3D & HTML5 Games) -->
     <div class="modal-backdrop" id="games-modal" hidden>
