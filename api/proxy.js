@@ -68,31 +68,38 @@ const SKIP_REQUEST_HEADERS = new Set([
   "origin",
   "referer",
   "cookie",
+  "forwarded",
+  "via",
+  "cdn-loop",
+  "true-client-ip",
+  "x-real-ip",
+  "x-client-ip",
+  "x-cluster-client-ip",
+  "traceparent",
+  "tracestate",
+  "x-request-id",
+  "x-correlation-id",
   "sec-fetch-site",
   "sec-fetch-mode",
   "sec-fetch-dest",
   "sec-fetch-user",
-  "x-forwarded-for",
-  "x-forwarded-host",
-  "x-forwarded-proto",
-  "x-forwarded-port",
-  "x-real-ip",
-  "x-vercel-id",
-  "x-vercel-deployment-url",
-  "x-vercel-forwarded-for",
-  "x-vercel-ip-city",
-  "x-vercel-ip-continent",
-  "x-vercel-ip-country",
-  "x-vercel-ip-country-region",
-  "x-vercel-ip-latitude",
-  "x-vercel-ip-longitude",
-  "x-vercel-ip-timezone",
-  "x-vercel-ja4-digest",
-  "x-vercel-proxied-for",
-  "x-vercel-sc-headers",
-  "x-vercel-sc-host",
-  "x-vercel-sc-basepath",
 ]);
+
+function shouldSkipRequestHeader(lower) {
+  if (!lower || lower.startsWith(":")) return true;
+  if (SKIP_REQUEST_HEADERS.has(lower)) return true;
+  if (
+    lower.startsWith("x-vercel") ||
+    lower.startsWith("x-forwarded") ||
+    lower.startsWith("x-amzn") ||
+    lower.startsWith("cf-") ||
+    lower.startsWith("fastly-") ||
+    lower.startsWith("x-nf-")
+  ) {
+    return true;
+  }
+  return false;
+}
 
 export function uvEncode(str) {
   if (!str) return "";
@@ -242,7 +249,11 @@ function buildProxyUrl(rawUrl, baseUrl, engine, adblock) {
     trimmed.startsWith("mailto:") ||
     trimmed.startsWith("tel:") ||
     trimmed.startsWith("/api/proxy") ||
-    trimmed.startsWith("/service/uv/")
+    trimmed.startsWith("/service/uv/") ||
+    trimmed.includes("'+") ||
+    trimmed.includes('"+') ||
+    trimmed.includes("${") ||
+    /[<>`\r\n]/.test(trimmed)
   ) {
     return rawUrl;
   }
@@ -1077,12 +1088,12 @@ export default async function proxyHandler(req, res) {
     }
 
     // Forward custom API headers (e.g. ms-cv, calling-app-name, authorization, x-ms-api-version)
-    // so sites like Xbox Cloud, Twitch, Reddit, etc. never reject backend API fetches
+    // while stripping all Vercel/Cloudflare/AWS proxy-identifying headers
     const sendHeaders = Object.create(null);
     for (const [k, v] of Object.entries(req.headers || {})) {
       if (v === undefined) continue;
       const lower = k.toLowerCase();
-      if (SKIP_REQUEST_HEADERS.has(lower) || lower.startsWith(":")) continue;
+      if (shouldSkipRequestHeader(lower)) continue;
       sendHeaders[k] = v;
     }
 
@@ -1117,16 +1128,28 @@ export default async function proxyHandler(req, res) {
         : targetUrl.origin;
 
     sendHeaders["Host"] = targetUrl.host;
-    sendHeaders["User-Agent"] = req.headers["user-agent"] || DEFAULT_UA;
+    sendHeaders["User-Agent"] = DEFAULT_UA;
     sendHeaders["Accept"] =
       req.headers["accept"] ||
       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
     sendHeaders["Accept-Language"] =
       req.headers["accept-language"] || "en-US,en;q=0.9";
     sendHeaders["Accept-Encoding"] = "gzip, deflate, br";
-    sendHeaders["Referer"] =
-      effectiveOrigin !== targetUrl.origin ? `${effectiveOrigin}/` : targetUrl.href;
-    sendHeaders["Origin"] = effectiveOrigin;
+    sendHeaders["Sec-Ch-Ua"] =
+      '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"';
+    sendHeaders["Sec-Ch-Ua-Mobile"] = "?0";
+    sendHeaders["Sec-Ch-Ua-Platform"] = '"macOS"';
+    if (isNavigateRequest) {
+      sendHeaders["Upgrade-Insecure-Requests"] = "1";
+      sendHeaders["Sec-Fetch-Site"] = "none";
+      sendHeaders["Sec-Fetch-Mode"] = "navigate";
+      sendHeaders["Sec-Fetch-User"] = "?1";
+      sendHeaders["Sec-Fetch-Dest"] = "document";
+    } else {
+      sendHeaders["Referer"] =
+        effectiveOrigin !== targetUrl.origin ? `${effectiveOrigin}/` : targetUrl.href;
+      sendHeaders["Origin"] = effectiveOrigin;
+    }
 
     let reqBody = null;
     if (req.method !== "GET" && req.method !== "HEAD") {
@@ -1139,7 +1162,7 @@ export default async function proxyHandler(req, res) {
       body: reqBody,
     });
 
-    const statusCode = upstreamRes.statusCode || 200;
+    let statusCode = upstreamRes.statusCode || 200;
     const contentType = String(upstreamRes.headers["content-type"] || "");
 
     for (const [k, v] of Object.entries(upstreamRes.headers)) {
@@ -1164,12 +1187,40 @@ export default async function proxyHandler(req, res) {
       contentType.includes("text/html") ||
       contentType.includes("application/xhtml+xml")
     ) {
-      // Remember current target origin in a cookie so any un-rewritten root-relative assets (/assets/..., /_next/...) can be auto-proxied by server.js!
       const originCookie = `__lp_origin=${encodeURIComponent(finalUrl.origin)}; Path=/; SameSite=Lax`;
       res.setHeader("Set-Cookie", [...sanitizedCookies, originCookie]);
 
       const buf = await readStreamToBuffer(stream);
-      const rawHtml = buf.toString("utf-8");
+      let rawHtml = buf.toString("utf-8");
+
+      // If upstream blocked datacenter IP (403/429/503), attempt fallback relay automatically
+      if (
+        (statusCode === 403 || statusCode === 429 || statusCode === 503) &&
+        (req.method === "GET" || !req.method)
+      ) {
+        try {
+          const relayUrl = new URL(
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(finalUrl.href)}`
+          );
+          const relayRes = await fetchUpstream(relayUrl, {
+            method: "GET",
+            headers: { "User-Agent": DEFAULT_UA, Accept: "text/html,*/*" },
+          });
+          if (relayRes.res.statusCode === 200) {
+            const relayBuf = await readStreamToBuffer(
+              createDecompressedStream(relayRes.res)
+            );
+            const relayText = relayBuf.toString("utf-8");
+            if (relayText && relayText.length > 200) {
+              rawHtml = relayText;
+              statusCode = 200;
+            }
+          } else {
+            relayRes.res.resume();
+          }
+        } catch {}
+      }
+
       const rewrittenHtml =
         engine === "reader"
           ? renderReaderModeHtml(rawHtml, finalUrl, adblock)

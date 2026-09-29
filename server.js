@@ -5,6 +5,7 @@ import express from "express";
 import vercelBareHandler from "./api/bare.js";
 import proxyHandler, { uvDecode } from "./api/proxy.js";
 import gamesHandler from "./api/games.js";
+import searchHandler from "./api/search.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "public");
@@ -32,10 +33,15 @@ app.get("/api/games", (req, res) => {
   void gamesHandler(req, res);
 });
 
+// Route built-in LucasBrowse Search API
+app.get("/api/search", (req, res) => {
+  void searchHandler(req, res);
+});
+
 // Health & latency ping endpoint
 app.get("/api/status", (_req, res) => {
   res.json({
-    name: "LucasProx",
+    name: "LucasBrowse",
     routes: ["auto", "route1", "route2", "route3", "route4"],
     timestamp: Date.now(),
     status: "online",

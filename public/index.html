@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LucasProx</title>
+    <title>LucasBrowse</title>
     <meta
       name="description"
-      content="LucasProx — Fast, private, minimalist web browser & cloud gaming hub."
+      content="LucasBrowse — Fast, private, unblockable web browser, search engine & cloud gaming hub."
     />
     <link
       id="page-favicon"
@@ -327,7 +327,7 @@
         <!-- Chill Google Chrome-Style New Tab Page -->
         <section class="launchpad" id="launchpad" aria-label="New Tab">
           <div class="launchpad-inner">
-            <h1 class="hero-title" id="btn-brand">Lucas<span>Prox</span></h1>
+            <h1 class="hero-title" id="btn-brand">Lucas<span>Browse</span></h1>
 
             <!-- Clean Chrome New Tab Search Box -->
             <form class="hero-search" id="hero-form" autocomplete="off">
@@ -357,7 +357,7 @@
                 type="text"
                 id="hero-input"
                 class="hero-search-input"
-                placeholder="Search the web or type a URL"
+                placeholder="Search LucasBrowse or type a URL"
                 spellcheck="false"
                 autofocus
               />
@@ -372,13 +372,51 @@
             type="button"
             class="customize-fab"
             id="btn-customize"
-            title="Customize LucasProx"
+            title="Customize LucasBrowse"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <span>Customize</span>
           </button>
+        </section>
+
+        <!-- Native Built-In LucasBrowse Search Engine View -->
+        <section class="lb-search-view" id="lb-search-view" hidden aria-label="LucasBrowse Search">
+          <div class="lb-search-header">
+            <div class="lb-search-header__top">
+              <button type="button" class="lb-brand-btn" id="lb-search-home-btn" title="LucasBrowse Home">
+                Lucas<span>Browse</span>
+              </button>
+              <form class="lb-search-form" id="lb-search-form" autocomplete="off">
+                <input
+                  type="text"
+                  id="lb-search-input"
+                  class="lb-search-input"
+                  placeholder="Search the web, games, articles, or enter any URL..."
+                  spellcheck="false"
+                />
+                <button type="submit" class="lb-search-submit" aria-label="Search">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2.2" />
+                    <path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+                  </svg>
+                  <span>Search</span>
+                </button>
+              </form>
+            </div>
+            <div class="lb-search-tabs" id="lb-search-tabs">
+              <button type="button" class="lb-search-tab is-active" data-lbtab="all">All Results</button>
+              <button type="button" class="lb-search-tab" data-lbtab="games">🎮 Instant Games</button>
+              <button type="button" class="lb-search-tab" data-lbtab="web">🌐 Web Links</button>
+              <button type="button" class="lb-search-tab" data-lbtab="wiki">📚 Encyclopedia</button>
+            </div>
+          </div>
+
+          <div class="lb-search-body" id="lb-search-body">
+            <div class="lb-search-main" id="lb-search-results"></div>
+            <aside class="lb-search-sidebar" id="lb-search-instant" hidden></aside>
+          </div>
         </section>
 
         <!-- Proxied Iframe Stage -->
@@ -661,6 +699,7 @@
               <label class="studio-field">
                 <span>Search Engine</span>
                 <select id="select-search" class="studio-select">
+                  <option value="lucasbrowse://search?q=%s">LucasBrowse Search (Built-in)</option>
                   <option value="https://duckduckgo.com/?q=%s">DuckDuckGo</option>
                   <option value="https://www.google.com/search?q=%s">Google</option>
                   <option value="https://search.brave.com/search?q=%s">Brave Search</option>

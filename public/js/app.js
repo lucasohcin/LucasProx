@@ -1,6 +1,6 @@
 const STORAGE_KEYS = {
   engine: "lucasprox:engine",
-  searchEngine: "lucasprox:search-engine",
+  searchEngine: "lucasbrowse:search-engine:v3",
   theme: "lucasprox:theme",
   accentColor: "lucasprox:accent-color",
   glowIntensity: "lucasprox:glow-intensity",
@@ -14,8 +14,8 @@ const STORAGE_KEYS = {
   customFavicon: "lucasprox:custom-favicon",
   panicUrl: "lucasprox:panic-url",
   adblock: "lucasprox:adblock",
-  bookmarks: "lucasprox:bookmarks:v2",
-  shortcuts: "lucasprox:shortcuts:v2",
+  bookmarks: "lucasbrowse:bookmarks:v3",
+  shortcuts: "lucasbrowse:shortcuts:v3",
   history: "lucasprox:history",
   notes: "lucasprox:notes",
 };
@@ -35,7 +35,7 @@ const ROUTE_LABELS = {
 
 const CLOAK_PRESETS = {
   default: {
-    title: "LucasProx",
+    title: "LucasBrowse",
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%237c5cff'/><path d='M30 70L50 26L70 70H57L50 53L43 70H30Z' fill='white'/></svg>",
   },
   docs: {
@@ -61,12 +61,13 @@ const CLOAK_PRESETS = {
 };
 
 const SEARCH_BANGS = {
-  "!g": "https://www.google.com/search?q=%s",
-  "!ddg": "https://duckduckgo.com/?q=%s",
-  "!b": "https://search.brave.com/search?q=%s",
-  "!yt": "https://www.youtube.com/results?search_query=%s",
+  "!lb": "lucasbrowse://search?q=%s",
+  "!g": "lucasbrowse://search?q=%s",
+  "!ddg": "lucasbrowse://search?q=%s",
+  "!b": "lucasbrowse://search?q=%s",
+  "!yt": "https://inv.nadeko.net/search?q=%s",
   "!w": "https://en.wikipedia.org/w/index.php?search=%s",
-  "!r": "https://www.reddit.com/search/?q=%s",
+  "!r": "https://old.reddit.com/search?q=%s",
   "!gh": "https://github.com/search?q=%s",
   "!hn": "https://hn.algolia.com/?q=%s",
 };
@@ -98,22 +99,22 @@ const ADBLOCK_HOST_PATTERNS = [
 
 const DEFAULT_SHORTCUTS = [
   { title: "Games Hub", url: "lucasprox://games", icon: "🎮" },
+  { title: "LucasBrowse", url: "lucasbrowse://search?q=", icon: "🔍" },
   { title: "Red Dead 3D", url: "https://html5.gamemonetize.co/a44bnhgsoo8ge4lr9s85lt83p7cz2h8d/", icon: "🤠" },
   { title: "GTA NY 3D", url: "https://html5.gamemonetize.co/zt4qt847w9o5z06a4ayj5kwy2p9eyifi/", icon: "🚓" },
   { title: "Slope 3D", url: "https://html5.gamemonetize.co/2tscjd5hjy09sm7owo0saawmk6lbo3i3/", icon: "🟢" },
-  { title: "DuckDuckGo", url: "https://duckduckgo.com", icon: "D" },
   { title: "Wikipedia", url: "https://www.wikipedia.org", icon: "W" },
   { title: "Reddit", url: "https://old.reddit.com", icon: "R" },
 ];
 
 const DEFAULT_BOOKMARKS = [
   { title: "🎮 Games Hub (1,430+)", url: "lucasprox://games" },
+  { title: "🔍 LucasBrowse Search", url: "lucasbrowse://search?q=" },
   { title: "🤠 Red Dead 3D", url: "https://html5.gamemonetize.co/a44bnhgsoo8ge4lr9s85lt83p7cz2h8d/" },
   { title: "🚓 GTA New York 3D", url: "https://html5.gamemonetize.co/zt4qt847w9o5z06a4ayj5kwy2p9eyifi/" },
   { title: "🔫 Call of Ops 3", url: "https://html5.gamemonetize.co/n3hf4ijzvtj1dycfglrh4d1ydp5wet5k/" },
   { title: "⛏ Minecraft 3D", url: "https://html5.gamemonetize.co/cznxajp3hzb8l7gtebaq96s0pbrfa33m/" },
   { title: "🟢 Slope 3D", url: "https://html5.gamemonetize.co/2tscjd5hjy09sm7owo0saawmk6lbo3i3/" },
-  { title: "DuckDuckGo", url: "https://duckduckgo.com" },
 ];
 
 // Instant-load verified free games while /api/games loads the full 1,430+ catalog
@@ -250,6 +251,15 @@ const framesStageEl = document.getElementById("frames-stage");
 const launchpadEl = document.getElementById("launchpad");
 const loadingBarEl = document.getElementById("loading-bar");
 
+// LucasBrowse Native Search View DOM
+const lbSearchViewEl = document.getElementById("lb-search-view");
+const lbSearchLogoBtn = document.getElementById("lb-search-logo");
+const lbSearchForm = document.getElementById("lb-search-form");
+const lbSearchInput = document.getElementById("lb-search-input");
+const lbSearchTabsEl = document.getElementById("lb-search-tabs");
+const lbSearchResultsEl = document.getElementById("lb-search-results");
+const lbSearchInstantEl = document.getElementById("lb-search-instant");
+
 const pingTextEl = document.getElementById("ping-text");
 const btnPanic = document.getElementById("btn-panic");
 
@@ -373,7 +383,8 @@ if (!ROUTE_LABELS[currentEngine]) currentEngine = "auto";
 
 let currentSearchTemplate =
   localStorage.getItem(STORAGE_KEYS.searchEngine) ||
-  "https://duckduckgo.com/?q=%s";
+  "lucasbrowse://search?q=%s";
+let currentSearchFilter = "all";
 let adblockEnabled = localStorage.getItem(STORAGE_KEYS.adblock) !== "0";
 let splitScreenEnabled = false;
 let secondaryTabId = null;
@@ -561,13 +572,48 @@ function syncProxyRouteLabel() {
 }
 
 /**
+ * Intercept blocked third-party search engine URLs and convert them to LucasBrowse Search
+ */
+function interceptExternalSearchUrl(urlStr) {
+  try {
+    const u = new URL(urlStr);
+    const host = u.hostname.toLowerCase().replace(/^www\./, "");
+    if (
+      host === "duckduckgo.com" ||
+      host === "html.duckduckgo.com" ||
+      host === "lite.duckduckgo.com" ||
+      host === "start.duckduckgo.com"
+    ) {
+      const q = u.searchParams.get("q") || "";
+      return `lucasbrowse://search?q=${encodeURIComponent(q)}`;
+    }
+    if (
+      (host === "google.com" || host === "bing.com" || host === "search.brave.com") &&
+      (u.pathname === "/" || u.pathname.startsWith("/search"))
+    ) {
+      const q = u.searchParams.get("q") || "";
+      return `lucasbrowse://search?q=${encodeURIComponent(q)}`;
+    }
+  } catch {}
+  return null;
+}
+
+/**
  * Resolve User Input
  */
 function resolveInput(rawInput) {
   const text = String(rawInput ?? "").trim();
   if (!text) return null;
 
-  if (text === "lucasprox://games") return "lucasprox://games";
+  if (text === "lucasprox://games" || text === "lucasbrowse://games") {
+    return "lucasprox://games";
+  }
+
+  if (/^lucas(?:browse|prox):\/\/search/i.test(text)) {
+    const qIndex = text.indexOf("?");
+    const qs = qIndex >= 0 ? text.slice(qIndex) : "?q=";
+    return `lucasbrowse://search${qs}`;
+  }
 
   const parts = text.split(/\s+/);
   const firstWord = parts[0].toLowerCase();
@@ -578,7 +624,8 @@ function resolveInput(rawInput) {
 
   if (/^https?:\/\//i.test(text)) {
     try {
-      return new URL(text).href;
+      const href = new URL(text).href;
+      return interceptExternalSearchUrl(href) || href;
     } catch {}
   }
 
@@ -586,15 +633,29 @@ function resolveInput(rawInput) {
     /^(?:(?:\d{1,3}\.){3}\d{1,3}|[^\s/?#@]+\.[a-z]{2,})(?::\d+)?(?:[/?#]\S*)?$/i;
   if (!text.includes(" ") && looksLikeDomain.test(text)) {
     try {
-      return new URL(`https://${text}`).href;
+      const href = new URL(`https://${text}`).href;
+      return interceptExternalSearchUrl(href) || href;
     } catch {}
   }
 
-  return currentSearchTemplate.replace("%s", encodeURIComponent(text));
+  const resolvedSearch = currentSearchTemplate.replace(
+    "%s",
+    encodeURIComponent(text)
+  );
+  return interceptExternalSearchUrl(resolvedSearch) || resolvedSearch;
 }
 
 function formatHostnameOrTitle(urlStr) {
   if (!urlStr) return "New Tab";
+  if (urlStr.startsWith("lucasbrowse://search")) {
+    try {
+      const qs = urlStr.split("?")[1] || "";
+      const q = new URLSearchParams(qs).get("q") || "";
+      return q ? `${q} - LucasBrowse` : "LucasBrowse Search";
+    } catch {
+      return "LucasBrowse Search";
+    }
+  }
   try {
     const u = new URL(urlStr);
     return u.hostname.replace(/^www\./, "") || urlStr;
@@ -1156,6 +1217,9 @@ function createTab({ select = true, url = "", engine = currentEngine } = {}) {
     engine,
     pinned: false,
     showLaunchpad: true,
+    showSearch: false,
+    searchQuery: "",
+    searchData: null,
     loading: false,
     iframe,
     sjFrame: null,
@@ -1192,8 +1256,14 @@ function selectTab(id) {
 
   const active = getActiveTab();
   if (active) {
-    addressInput.value = active.url;
+    addressInput.value = active.showSearch
+      ? active.searchQuery || active.url
+      : active.url;
     heroInput.value = active.showLaunchpad ? "" : active.url;
+    if (active.showSearch && lbSearchInput) {
+      lbSearchInput.value = active.searchQuery || "";
+      renderLucasBrowseSearchResults(active);
+    }
     if (active.engine && ROUTE_LABELS[active.engine]) {
       currentEngine = active.engine;
       syncProxyRouteLabel();
@@ -1393,7 +1463,323 @@ function resetTabIframeIfHooked(tab) {
 }
 
 /**
- * Navigate Tab (Guaranteed Load across all websites & games)
+ * Native Unblockable LucasBrowse Search Engine
+ */
+function findMatchingGamesForQuery(query) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return allGamesCatalog.slice(0, 8);
+  const words = q.split(/\s+/).filter(Boolean);
+  return allGamesCatalog
+    .filter((g) => {
+      const hay = `${g.title} ${g.badge || ""} ${g.category || ""} ${g.studio || ""}`.toLowerCase();
+      return hay.includes(q) || words.every((w) => hay.includes(w));
+    })
+    .slice(0, 8);
+}
+
+async function performLucasBrowseSearch(query, tab) {
+  const cleanQuery = String(query || "").trim();
+  const matchedGames = findMatchingGamesForQuery(cleanQuery);
+
+  if (lbSearchInput && tab.id === activeTabId) {
+    lbSearchInput.value = cleanQuery;
+  }
+
+  if (!cleanQuery) {
+    tab.loading = false;
+    tab.searchData = {
+      query: "",
+      apiData: { results: [], instant: null },
+      matchedGames,
+    };
+    if (tab.id === activeTabId) {
+      renderLucasBrowseSearchResults(tab);
+    }
+    renderUI();
+    return;
+  }
+
+  logNetworkEvent(
+    "SEARCH",
+    `/api/search?q=${encodeURIComponent(cleanQuery)}`,
+    "LucasBrowse"
+  );
+
+  if (tab.id === activeTabId && lbSearchResultsEl) {
+    lbSearchResultsEl.innerHTML = `<div class="lb-empty-state">Searching LucasBrowse for <strong>${escapeHtml(
+      cleanQuery
+    )}</strong>...</div>`;
+    if (lbSearchInstantEl) lbSearchInstantEl.hidden = true;
+  }
+
+  try {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(cleanQuery)}`);
+    const apiData = res.ok ? await res.json() : { results: [], instant: null };
+    tab.searchData = {
+      query: cleanQuery,
+      apiData,
+      matchedGames: findMatchingGamesForQuery(cleanQuery),
+    };
+  } catch {
+    tab.searchData = {
+      query: cleanQuery,
+      apiData: { results: [], instant: null },
+      matchedGames,
+    };
+  } finally {
+    tab.loading = false;
+    if (tab.id === activeTabId) {
+      renderLucasBrowseSearchResults(tab);
+    }
+    renderUI();
+  }
+}
+
+function renderLucasBrowseSearchResults(tab) {
+  if (!lbSearchResultsEl || !tab) return;
+  const data = tab.searchData || {
+    query: tab.searchQuery || "",
+    apiData: { results: [], instant: null },
+    matchedGames: findMatchingGamesForQuery(tab.searchQuery || ""),
+  };
+
+  const query = data.query || "";
+  const rawResults = Array.isArray(data.apiData?.results)
+    ? data.apiData.results
+    : [];
+  const instant = data.apiData?.instant || null;
+  const matchedGames = Array.isArray(data.matchedGames)
+    ? data.matchedGames
+    : [];
+
+  const nodes = [];
+
+  // If query is empty, show Quick Search topics & Featured Games
+  if (!query) {
+    const exploreCard = document.createElement("div");
+    exploreCard.className = "lb-result-card";
+    exploreCard.innerHTML = `
+      <div class="lb-result-card__meta">
+        <span class="lb-result-card__source">LucasBrowse Engine</span>
+        <span>Unblockable Built-in Web & Game Search</span>
+      </div>
+      <div class="lb-result-card__title">Search anything without captchas or proxy blocks</div>
+      <div class="lb-result-card__snippet">
+        Type any topic, website, or game above. LucasBrowse searches the web, Wikipedia, and 1,430+ instant-play 3D & HTML5 games directly from the server so search engines never block you.
+      </div>
+    `;
+    const chipsWrap = document.createElement("div");
+    chipsWrap.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;";
+    const sampleQueries = [
+      "Red Dead Redemption",
+      "Grand Theft Auto",
+      "Minecraft",
+      "Wikipedia",
+      "Reddit",
+      "GitHub",
+      "Space Exploration",
+      "World History",
+      "Cyberpunk",
+      "Call of Duty",
+    ];
+    for (const sample of sampleQueries) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "bookmark-pill";
+      chip.textContent = `🔍 ${sample}`;
+      chip.addEventListener("click", () => {
+        void navigateTo(`lucasbrowse://search?q=${encodeURIComponent(sample)}`);
+      });
+      chipsWrap.appendChild(chip);
+    }
+    exploreCard.appendChild(chipsWrap);
+    nodes.push(exploreCard);
+  }
+
+  // 1. Playable Games Strip (when filter is "all" or "games")
+  if (
+    (currentSearchFilter === "all" || currentSearchFilter === "games") &&
+    matchedGames.length > 0
+  ) {
+    const gamesBox = document.createElement("div");
+    gamesBox.className = "lb-search-games-strip";
+    gamesBox.innerHTML = `
+      <div class="lb-search-games-strip__header">
+        <span>🎮 Instant-Play Games (${matchedGames.length} matches)</span>
+        <button type="button" class="bookmark-pill" id="lb-open-all-games">Browse All 1,430+ Games →</button>
+      </div>
+      <div class="lb-search-games-row"></div>
+    `;
+    const openAllBtn = gamesBox.querySelector("#lb-open-all-games");
+    openAllBtn?.addEventListener("click", () => openGamesHub());
+
+    const rowEl = gamesBox.querySelector(".lb-search-games-row");
+    for (const game of matchedGames) {
+      const gBtn = document.createElement("button");
+      gBtn.type = "button";
+      gBtn.className = "lb-mini-game";
+      gBtn.innerHTML = `
+        ${
+          game.thumb
+            ? `<img src="${escapeHtml(game.thumb)}" alt="${escapeHtml(
+                game.title
+              )}" loading="lazy" />`
+            : ""
+        }
+        <div class="lb-mini-game__info">
+          <div class="lb-mini-game__title">${escapeHtml(game.title)}</div>
+          <div class="lb-mini-game__sub">${escapeHtml(
+            game.badge || "Instant Play"
+          )}</div>
+        </div>
+      `;
+      gBtn.addEventListener("click", () => {
+        const forceEngine = game.directEmbed !== false ? "embed" : null;
+        void navigateTo(game.url, { forceEngine, customTitle: game.title });
+      });
+      rowEl?.appendChild(gBtn);
+    }
+    nodes.push(gamesBox);
+  }
+
+  // 2. Filter Web Results
+  if (currentSearchFilter !== "games") {
+    const filteredResults = rawResults.filter((r) => {
+      if (currentSearchFilter === "wiki") {
+        return (
+          String(r.source || "")
+            .toLowerCase()
+            .includes("wikipedia") ||
+          String(r.url || "").includes("wikipedia.org")
+        );
+      }
+      return true;
+    });
+
+    for (const item of filteredResults) {
+      const card = document.createElement("div");
+      card.className = "lb-result-card";
+
+      let domain = "";
+      try {
+        domain = new URL(item.url).hostname.replace(/^www\./, "");
+      } catch {
+        domain = item.url;
+      }
+
+      card.innerHTML = `
+        <div class="lb-result-card__meta">
+          <span class="lb-result-card__source">${escapeHtml(
+            item.source || "Web"
+          )}</span>
+          <span class="lb-result-card__domain">${escapeHtml(domain)}</span>
+        </div>
+        <div class="lb-result-card__title">${escapeHtml(item.title)}</div>
+        <div class="lb-result-card__snippet">${escapeHtml(
+          item.snippet || ""
+        )}</div>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button type="button" class="bookmark-pill" data-action="open">Open in LucasBrowse</button>
+          <button type="button" class="bookmark-pill" data-action="reader" title="Guaranteed unblockable clean article view">📖 Reader Mode</button>
+          <button type="button" class="bookmark-pill" data-action="newtab">↗ New Tab</button>
+        </div>
+      `;
+
+      const openSite = () =>
+        void navigateTo(item.url, { customTitle: item.title });
+
+      card
+        .querySelector(".lb-result-card__title")
+        ?.addEventListener("click", openSite);
+      card
+        .querySelector('[data-action="open"]')
+        ?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openSite();
+        });
+      card
+        .querySelector('[data-action="reader"]')
+        ?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          void navigateTo(item.url, {
+            forceEngine: "reader",
+            customTitle: item.title,
+          });
+        });
+      card
+        .querySelector('[data-action="newtab"]')
+        ?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          createTab({ select: true, url: item.url });
+        });
+
+      nodes.push(card);
+    }
+
+    if (query && filteredResults.length === 0 && matchedGames.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "lb-empty-state";
+      empty.textContent = `No results found for "${query}". Try another search term or enter a direct website URL.`;
+      nodes.push(empty);
+    }
+  }
+
+  lbSearchResultsEl.replaceChildren(...nodes);
+
+  // 3. Instant Knowledge Panel
+  if (lbSearchInstantEl) {
+    if (instant && (instant.abstract || instant.title)) {
+      lbSearchInstantEl.hidden = false;
+      lbSearchInstantEl.innerHTML = `
+        ${
+          instant.image
+            ? `<img class="lb-instant-card__img" src="${escapeHtml(
+                instant.image
+              )}" alt="${escapeHtml(instant.title)}" loading="lazy" />`
+            : ""
+        }
+        <h3 class="lb-instant-card__title">${escapeHtml(instant.title)}</h3>
+        ${
+          instant.subtitle
+            ? `<div class="lb-instant-card__sub">${escapeHtml(
+                instant.subtitle
+              )}</div>`
+            : ""
+        }
+        <p class="lb-instant-card__text">${escapeHtml(
+          instant.abstract || ""
+        )}</p>
+        ${
+          instant.url
+            ? `<div style="display:flex;gap:8px;margin-top:12px;">
+                <button type="button" class="bookmark-pill" id="lb-instant-open">Open Article →</button>
+                <button type="button" class="bookmark-pill" id="lb-instant-reader">📖 Reader Mode</button>
+              </div>`
+            : ""
+        }
+      `;
+      lbSearchInstantEl
+        .querySelector("#lb-instant-open")
+        ?.addEventListener("click", () => {
+          void navigateTo(instant.url, { customTitle: instant.title });
+        });
+      lbSearchInstantEl
+        .querySelector("#lb-instant-reader")
+        ?.addEventListener("click", () => {
+          void navigateTo(instant.url, {
+            forceEngine: "reader",
+            customTitle: instant.title,
+          });
+        });
+    } else {
+      lbSearchInstantEl.hidden = true;
+      lbSearchInstantEl.innerHTML = "";
+    }
+  }
+}
+
+/**
+ * Navigate Tab (Guaranteed Load across all websites, searches & games)
  */
 async function navigateTo(
   rawInput,
@@ -1412,6 +1798,35 @@ async function navigateTo(
     targetTab = createTab({ select: true });
   }
 
+  // Handle Built-in Unblockable LucasBrowse Search
+  if (targetUrl.startsWith("lucasbrowse://search")) {
+    const qs = targetUrl.split("?")[1] || "";
+    const searchQuery = new URLSearchParams(qs).get("q") || "";
+    targetTab.showLaunchpad = false;
+    targetTab.showSearch = true;
+    targetTab.searchQuery = searchQuery;
+    targetTab.loading = Boolean(searchQuery);
+    targetTab.url = targetUrl;
+    targetTab.title =
+      customTitle ||
+      (searchQuery ? `${searchQuery} - LucasBrowse` : "LucasBrowse Search");
+
+    if (pushHistory) {
+      recordTabUrl(targetTab, targetUrl);
+    }
+
+    if (targetTab.id === activeTabId) {
+      addressInput.value = searchQuery || "lucasbrowse://search";
+    }
+    omniboxSuggestionsEl.hidden = true;
+    addressInput.blur();
+    heroInput.blur();
+    renderUI();
+
+    await performLucasBrowseSearch(searchQuery, targetTab);
+    return;
+  }
+
   const matchedGame = allGamesCatalog.find((g) => g.url === targetUrl);
   const resolvedTitle =
     customTitle || matchedGame?.title || formatHostnameOrTitle(targetUrl);
@@ -1422,6 +1837,7 @@ async function navigateTo(
     targetTab.engine = engineToUse;
   }
   targetTab.showLaunchpad = false;
+  targetTab.showSearch = false;
   targetTab.loading = true;
   targetTab.url = targetUrl;
   targetTab.title = resolvedTitle;
@@ -1575,13 +1991,23 @@ function renderUI() {
   const showLaunchpadOverlay = active.showLaunchpad && !anySplitVisible;
   launchpadEl.classList.toggle("is-hidden", !showLaunchpadOverlay);
 
+  const showSearchOverlay =
+    Boolean(active.showSearch) && !active.showLaunchpad && !anySplitVisible;
+  if (lbSearchViewEl) {
+    lbSearchViewEl.hidden = !showSearchOverlay;
+  }
+
   framesStageEl.classList.toggle("is-split", Boolean(splitScreenEnabled && secondaryTabId));
   btnSplitView.classList.toggle("is-active", splitScreenEnabled);
 
   for (const tab of tabs) {
-    const isPrimary = tab.id === active.id && !tab.showLaunchpad;
+    const isPrimary =
+      tab.id === active.id && !tab.showLaunchpad && !tab.showSearch;
     const isSecondary =
-      splitScreenEnabled && tab.id === secondaryTabId && !tab.showLaunchpad;
+      splitScreenEnabled &&
+      tab.id === secondaryTabId &&
+      !tab.showLaunchpad &&
+      !tab.showSearch;
     tab.iframe.classList.toggle("is-active", isPrimary);
     tab.iframe.classList.toggle("is-split-visible", isSecondary);
   }
@@ -1700,6 +2126,13 @@ async function ensureGamesLoaded() {
       gamesTotalBadge.textContent = `${data.games.length.toLocaleString()} Free Games`;
       if (!gamesModal.hidden) {
         renderGamesGrid();
+      }
+      const active = getActiveTab();
+      if (active?.showSearch && active.searchData) {
+        active.searchData.matchedGames = findMatchingGamesForQuery(
+          active.searchQuery || ""
+        );
+        renderLucasBrowseSearchResults(active);
       }
     }
   } catch {}
@@ -2213,6 +2646,39 @@ heroForm.addEventListener("submit", (e) => {
   void navigateTo(heroInput.value);
 });
 
+lbSearchForm?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const val = lbSearchInput?.value?.trim() || "";
+  if (!val) return;
+  if (/^https?:\/\//i.test(val) || (!val.includes(" ") && /\.[a-z]{2,}$/i.test(val))) {
+    void navigateTo(val);
+  } else {
+    void navigateTo(`lucasbrowse://search?q=${encodeURIComponent(val)}`);
+  }
+});
+
+lbSearchLogoBtn?.addEventListener("click", () => {
+  const active = getActiveTab();
+  if (!active) return;
+  active.showLaunchpad = true;
+  active.showSearch = false;
+  renderUI();
+  heroInput.focus();
+});
+
+lbSearchTabsEl?.querySelectorAll(".lb-search-tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    currentSearchFilter = btn.dataset.searchTab || "all";
+    lbSearchTabsEl.querySelectorAll(".lb-search-tab").forEach((b) => {
+      b.classList.toggle("is-active", b === btn);
+    });
+    const active = getActiveTab();
+    if (active?.showSearch) {
+      renderLucasBrowseSearchResults(active);
+    }
+  });
+});
+
 btnGamesHub.addEventListener("click", () => openGamesHub());
 btnGamesClose.addEventListener("click", () => (gamesModal.hidden = true));
 gamesModal.addEventListener("click", (e) => {
@@ -2255,6 +2721,7 @@ btnBrand.addEventListener("click", () => {
   const active = getActiveTab();
   if (!active) return;
   active.showLaunchpad = true;
+  active.showSearch = false;
   renderUI();
   heroInput.focus();
 });
