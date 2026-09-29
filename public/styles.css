@@ -1643,8 +1643,8 @@ body.is-fullscreen .chrome-bar {
 /* Block Google Auto Ads from injecting random layout-breaking banners into the browser UI */
 .google-auto-placed,
 .adsbygoogle-noablate,
-body > ins.adsbygoogle,
-.app-shell ins.adsbygoogle {
+body > ins.adsbygoogle:not(#lucasbrowse-ad-unit),
+.app-shell > ins.adsbygoogle {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
@@ -1653,7 +1653,7 @@ body > ins.adsbygoogle,
   pointer-events: none !important;
 }
 
-/* Tiny Non-Intrusive Floating Google AdSense Pill */
+/* Floating Google AdSense Pill */
 .bottom-ad-bar {
   position: fixed !important;
   left: 12px !important;
@@ -1667,17 +1667,16 @@ body > ins.adsbygoogle,
   max-height: 52px !important;
   width: auto !important;
   max-width: 380px !important;
-  padding: 2px 30px 2px 8px;
+  padding: 2px 28px 2px 8px;
   border-radius: 10px;
-  background: rgba(12, 14, 22, 0.92);
+  background: rgba(12, 14, 22, 0.94);
   backdrop-filter: blur(10px);
   border: 1px solid var(--border-subtle);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
   overflow: hidden !important;
 }
 
 .bottom-ad-bar[hidden],
-.bottom-ad-bar:has(ins[data-ad-status="unfilled"]),
 body.is-fullscreen .bottom-ad-bar {
   display: none !important;
 }
@@ -1708,12 +1707,27 @@ body.is-fullscreen .bottom-ad-bar {
 }
 
 .bottom-ad-bar__slot ins.adsbygoogle {
-  display: inline-block !important;
+  display: block !important;
   width: 320px !important;
   height: 50px !important;
   max-width: 320px !important;
   max-height: 50px !important;
   overflow: hidden !important;
+}
+
+/* Games Hub Ad Container */
+.games-hub-ad-wrap {
+  width: 100%;
+  max-width: 728px;
+  min-height: 60px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
 }
 
 .bottom-ad-bar__close {

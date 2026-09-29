@@ -3161,22 +3161,12 @@ function installAdSenseLayoutGuard() {
       if (el.style?.paddingTop) el.style.removeProperty("padding-top");
     }
 
-    // Remove any random Auto Ads placements injected outside our tiny corner ad pill
+    // Remove any random Auto Ads placements injected outside our designated ad slots
     document
       .querySelectorAll(
-        ".google-auto-placed, .adsbygoogle-noablate, ins.adsbygoogle:not(#lucasbrowse-ad-unit)"
+        ".google-auto-placed, .adsbygoogle-noablate, ins.adsbygoogle:not(#lucasbrowse-ad-unit):not(#lucasbrowse-games-ad-unit)"
       )
       .forEach((node) => node.remove());
-
-    // Hide the corner ad pill if AdSense reports unfilled
-    const adUnit = document.getElementById("lucasbrowse-ad-unit");
-    const adBar = document.getElementById("bottom-ad-bar");
-    if (adUnit && adBar) {
-      const status = adUnit.getAttribute("data-ad-status");
-      if (status === "unfilled") {
-        adBar.hidden = true;
-      }
-    }
   };
 
   cleanLayoutMutations();
