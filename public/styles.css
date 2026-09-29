@@ -1633,11 +1633,88 @@ body.is-fullscreen .chrome-bar {
   padding: 20px 0 8px;
 }
 
+/* Tiny Bottom Google AdSense Bar */
+.bottom-ad-bar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 54px;
+  min-height: 54px;
+  padding: 2px 12px;
+  background: var(--bg-chrome, rgba(14, 15, 22, 0.94));
+  border-top: 1px solid var(--border-subtle);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.bottom-ad-bar[hidden] {
+  display: none !important;
+}
+
+body.is-fullscreen .bottom-ad-bar {
+  display: none !important;
+}
+
+.bottom-ad-bar__label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.bottom-ad-bar__slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+  max-height: 50px;
+  width: 100%;
+  max-width: 728px;
+  overflow: hidden;
+}
+
+.bottom-ad-bar__close {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.bottom-ad-bar__close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
 @media (max-width: 720px) {
   .top-status-cluster {
     display: none;
   }
   .games-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .bottom-ad-bar__label {
+    display: none;
   }
 }
