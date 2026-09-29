@@ -3,20 +3,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import vercelBareHandler from "./api/bare.js";
-import proxyHandler from "./api/proxy.js";
+import proxyHandler, { uvDecode } from "./api/proxy.js";
+import gamesHandler from "./api/games.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "public");
 
 const app = express();
-
-// Cross-origin isolation headers
-app.use((_req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
-  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
-  next();
-});
 
 // Route tunnel requests
 app.all(["/bare", "/bare/*", "/api/bare", "/api/bare/*"], (req, res) => {
@@ -26,6 +19,11 @@ app.all(["/bare", "/bare/*", "/api/bare", "/api/bare/*"], (req, res) => {
 // Route multi-proxy requests
 app.all(["/api/proxy", "/api/proxy/*", "/service/uv/*"], (req, res) => {
   void proxyHandler(req, res);
+});
+
+// Route 1,000+ HTML5 & AAA Cloud Games API
+app.get("/api/games", (req, res) => {
+  void gamesHandler(req, res);
 });
 
 // Health & latency ping endpoint
@@ -41,8 +39,48 @@ app.get("/api/status", (_req, res) => {
 // Serve static files from public/
 app.use(express.static(publicDir));
 
-// SPA fallback to index.html
-app.get("*", (_req, res) => {
+/**
+ * Extract target origin from Referer header or __lp_origin cookie
+ * so root-relative requests (/_next/..., /assets/..., /static/...) from proxied sites
+ * are automatically proxied instead of hitting the SPA index.html fallback!
+ */
+function extractProxiedOrigin(req) {
+  const referer = req.headers.referer || "";
+  if (referer) {
+    try {
+      const refUrl = new URL(referer);
+      if (refUrl.pathname.startsWith("/api/proxy")) {
+        const rawTarget = refUrl.searchParams.get("url");
+        if (rawTarget) return new URL(rawTarget).origin;
+      } else if (refUrl.pathname.startsWith("/service/uv/")) {
+        const encoded = refUrl.pathname.slice("/service/uv/".length);
+        const decoded = uvDecode(encoded);
+        if (decoded) return new URL(decoded).origin;
+      }
+    } catch {}
+  }
+
+  const cookieHeader = req.headers.cookie || "";
+  const match = cookieHeader.match(/(?:^|;\s*)__lp_origin=([^;]+)/);
+  if (match && match[1]) {
+    try {
+      return new URL(decodeURIComponent(match[1])).origin;
+    } catch {}
+  }
+
+  return null;
+}
+
+app.all("*", (req, res) => {
+  if (req.path !== "/" && req.path !== "/index.html") {
+    const targetOrigin = extractProxiedOrigin(req);
+    if (targetOrigin) {
+      const resolvedUrl = `${targetOrigin}${req.originalUrl}`;
+      req.url = `/api/proxy?engine=direct&url=${encodeURIComponent(resolvedUrl)}`;
+      void proxyHandler(req, res);
+      return;
+    }
+  }
   res.sendFile(path.join(publicDir, "index.html"));
 });
 

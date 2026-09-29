@@ -6,7 +6,7 @@
     <title>LucasProx</title>
     <meta
       name="description"
-      content="LucasProx — Fast, private, minimalist web browser."
+      content="LucasProx — Fast, private, minimalist web browser & cloud gaming hub."
     />
     <link
       id="page-favicon"
@@ -193,9 +193,19 @@
           <div class="utility-controls">
             <button
               type="button"
+              class="games-pill-btn"
+              id="btn-games-hub"
+              title="Open Games Hub (1,000+ HTML5 & AAA Cloud Games)"
+            >
+              <span>🎮</span>
+              <span>Games</span>
+            </button>
+
+            <button
+              type="button"
               class="switch-proxy-btn"
               id="btn-switch-proxy"
-              title="Auto-selects the fastest working proxy. Click to switch proxy route if a site isn't loading."
+              title="Auto-selects the working proxy. Click to switch proxy route if a site isn't loading."
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                 <path d="M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -249,6 +259,10 @@
                 <button type="button" class="dropdown-item" id="menu-new-tab">
                   <span>New Tab</span>
                   <kbd>⌘T</kbd>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-games">
+                  <span>Games Hub (1,000+)</span>
+                  <kbd>🎮</kbd>
                 </button>
                 <button type="button" class="dropdown-item" id="menu-duplicate-tab">
                   <span>Duplicate Tab</span>
@@ -366,7 +380,7 @@
         <!-- Proxied Iframe Stage -->
         <div class="frames-stage" id="frames-stage"></div>
 
-        <!-- Developer Console Dock (Hidden unless opened from menu) -->
+        <!-- Developer Console Dock -->
         <aside class="devtools-dock" id="devtools-dock" hidden aria-label="Console">
           <div class="devtools-header">
             <div class="devtools-tabs">
@@ -413,6 +427,48 @@
       >
         Exit Fullscreen
       </button>
+    </div>
+
+    <!-- Games Hub Modal (1,000+ HTML5 Games & AAA Cloud Gaming) -->
+    <div class="modal-backdrop" id="games-modal" hidden>
+      <div class="games-hub-modal" role="dialog" aria-label="Games Hub">
+        <div class="games-hub-header">
+          <div class="games-hub-title-row">
+            <div>
+              <h2>🎮 LucasProx Games Hub <span class="games-count-pill" id="games-total-badge">1,100+ Games</span></h2>
+              <p>Play AAA Cloud Games (Red Dead Redemption 2, GTA V, Fortnite, Cyberpunk 2077, CoD) &amp; 1,000+ Instant HTML5 Games.</p>
+            </div>
+            <button type="button" class="icon-btn" id="btn-games-close" aria-label="Close Games Hub">✕</button>
+          </div>
+
+          <div class="games-hub-controls">
+            <input
+              type="text"
+              id="games-search-input"
+              class="games-search-input"
+              placeholder="Search 1,100+ games (e.g. Red Dead Redemption, GTA, Fortnite, Slope, Retro Bowl, 1v1.LOL, Krunker)..."
+              autocomplete="off"
+            />
+            <div class="games-categories" id="games-categories">
+              <button type="button" class="game-cat-btn is-active" data-cat="all">🔥 All</button>
+              <button type="button" class="game-cat-btn" data-cat="aaa">💎 AAA Cloud</button>
+              <button type="button" class="game-cat-btn" data-cat="arcade">🕹 Arcade</button>
+              <button type="button" class="game-cat-btn" data-cat="action">🔫 Action &amp; FPS</button>
+              <button type="button" class="game-cat-btn" data-cat="racing">🏎 Racing</button>
+              <button type="button" class="game-cat-btn" data-cat="io">🌐 .IO Multiplayer</button>
+              <button type="button" class="game-cat-btn" data-cat="sports">⚽ Sports</button>
+              <button type="button" class="game-cat-btn" data-cat="puzzle">🧩 Puzzle</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="games-hub-body" id="games-hub-body">
+          <div class="games-grid" id="games-grid"></div>
+          <div class="games-load-more-wrap" id="games-load-more-wrap">
+            <button type="button" class="mini-btn" id="btn-load-more-games">Load More Games</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Command Palette Modal (Ctrl+P / Cmd+P) -->

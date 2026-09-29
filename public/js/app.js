@@ -20,8 +20,8 @@ const STORAGE_KEYS = {
   notes: "lucasprox:notes",
 };
 
-// Generic, unbranded proxy route names
-const PROXY_CYCLE_ORDER = ["auto", "scramjet", "uv", "aero", "direct"];
+// Generic, unbranded proxy route cycle
+const PROXY_CYCLE_ORDER = ["auto", "scramjet", "uv", "aero", "direct", "embed"];
 
 const ROUTE_LABELS = {
   auto: "Auto",
@@ -29,6 +29,7 @@ const ROUTE_LABELS = {
   uv: "Proxy 2",
   aero: "Proxy 3",
   direct: "Proxy 4",
+  embed: "Direct",
   reader: "Reader",
 };
 
@@ -96,20 +97,134 @@ const ADBLOCK_HOST_PATTERNS = [
 ];
 
 const DEFAULT_SHORTCUTS = [
+  { title: "Games Hub", url: "lucasprox://games", icon: "🎮" },
   { title: "DuckDuckGo", url: "https://duckduckgo.com", icon: "D" },
   { title: "Wikipedia", url: "https://www.wikipedia.org", icon: "W" },
   { title: "Reddit", url: "https://old.reddit.com", icon: "R" },
   { title: "Hacker News", url: "https://news.ycombinator.com", icon: "Y" },
-  { title: "GitHub", url: "https://github.com", icon: "G" },
-  { title: "Archive", url: "https://archive.org", icon: "A" },
+  { title: "Xbox Cloud", url: "https://www.xbox.com/play", icon: "X" },
+  { title: "GeForce NOW", url: "https://play.geforcenow.com", icon: "N" },
 ];
 
 const DEFAULT_BOOKMARKS = [
+  { title: "🎮 Games (1,100+)", url: "lucasprox://games" },
+  { title: "Red Dead Redemption 2", url: "https://cloud.boosteroid.com/application/849" },
+  { title: "Fortnite Cloud", url: "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2" },
   { title: "DuckDuckGo", url: "https://duckduckgo.com" },
   { title: "Wikipedia", url: "https://www.wikipedia.org" },
-  { title: "Hacker News", url: "https://news.ycombinator.com" },
   { title: "Reddit", url: "https://old.reddit.com" },
-  { title: "Archive.org", url: "https://archive.org" },
+];
+
+// Instant-load starter games while /api/games loads the full 1,100+ catalog
+const STARTER_GAMES = [
+  {
+    id: "aaa-rdr2",
+    title: "Red Dead Redemption 2",
+    category: "aaa",
+    badge: "AAA Cloud",
+    studio: "Rockstar Games • Cloud Stream",
+    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1174180/header.jpg",
+    url: "https://cloud.boosteroid.com/application/849",
+  },
+  {
+    id: "aaa-rdr1",
+    title: "Red Dead Redemption",
+    category: "aaa",
+    badge: "AAA Cloud",
+    studio: "Rockstar Games • Xbox Cloud",
+    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2668510/header.jpg",
+    url: "https://www.xbox.com/en-US/play/games/red-dead-redemption/BWKLPNS6717R",
+  },
+  {
+    id: "aaa-gtav",
+    title: "Grand Theft Auto V (GTA 5)",
+    category: "aaa",
+    badge: "AAA Cloud",
+    studio: "Rockstar Games • Xbox Cloud",
+    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/271590/header.jpg",
+    url: "https://www.xbox.com/en-US/play/games/grand-theft-auto-v/BPJ686W6S0NH",
+  },
+  {
+    id: "aaa-fortnite",
+    title: "Fortnite (Free Cloud Play)",
+    category: "aaa",
+    badge: "Free Cloud",
+    studio: "Epic Games • Xbox Cloud",
+    thumb: "https://cdn2.unrealengine.com/social-image-chapter4-s3-3840x2160-d35912cc25ad.jpg",
+    url: "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2",
+  },
+  {
+    id: "aaa-cyberpunk",
+    title: "Cyberpunk 2077",
+    category: "aaa",
+    badge: "AAA Cloud",
+    studio: "CD Projekt Red • GeForce NOW",
+    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1091500/header.jpg",
+    url: "https://play.geforcenow.com",
+  },
+  {
+    id: "aaa-cod",
+    title: "Call of Duty: Warzone & BO6",
+    category: "aaa",
+    badge: "AAA Cloud",
+    studio: "Activision • Xbox Cloud",
+    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1938090/header.jpg",
+    url: "https://www.xbox.com/en-US/play/games/call-of-duty-black-ops-6/9PF528M6CRHQ",
+  },
+  {
+    id: "aaa-eldenring",
+    title: "Elden Ring",
+    category: "aaa",
+    badge: "AAA Cloud",
+    studio: "FromSoftware • Boosteroid",
+    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1245620/header.jpg",
+    url: "https://cloud.boosteroid.com/application/1164",
+  },
+  {
+    id: "aaa-forza5",
+    title: "Forza Horizon 5",
+    category: "aaa",
+    badge: "AAA Cloud",
+    studio: "Xbox Cloud Gaming",
+    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1551360/header.jpg",
+    url: "https://www.xbox.com/en-US/play/games/forza-horizon-5/9NKX70BBCDRN",
+  },
+  {
+    id: "pop-slope",
+    title: "Slope 3D",
+    category: "arcade",
+    badge: "HTML5",
+    studio: "WebGL Arcade",
+    url: "https://slope-game.github.io/",
+    directEmbed: true,
+  },
+  {
+    id: "pop-retrobowl",
+    title: "Retro Bowl",
+    category: "sports",
+    badge: "HTML5",
+    studio: "Sports Classic",
+    url: "https://retro-bowl.github.io/",
+    directEmbed: true,
+  },
+  {
+    id: "pop-2048",
+    title: "2048 Original",
+    category: "puzzle",
+    badge: "HTML5",
+    studio: "Puzzle Classic",
+    url: "https://play2048.co/",
+    directEmbed: true,
+  },
+  {
+    id: "pop-minecraft",
+    title: "Minecraft Classic",
+    category: "aaa",
+    badge: "WebGL",
+    studio: "Mojang Official Web",
+    url: "https://classic.minecraft.net/",
+    directEmbed: true,
+  },
 ];
 
 // DOM References
@@ -142,6 +257,7 @@ const btnForward = document.getElementById("btn-forward");
 const btnReload = document.getElementById("btn-reload");
 const btnHome = document.getElementById("btn-home");
 
+const btnGamesHub = document.getElementById("btn-games-hub");
 const btnSwitchProxy = document.getElementById("btn-switch-proxy");
 const proxyRouteLabelEl = document.getElementById("proxy-route-label");
 const btnAdblock = document.getElementById("btn-adblock");
@@ -150,6 +266,7 @@ const btnMoreMenu = document.getElementById("btn-more-menu");
 const chromeDropdownEl = document.getElementById("chrome-dropdown");
 
 const menuNewTab = document.getElementById("menu-new-tab");
+const menuGames = document.getElementById("menu-games");
 const menuDuplicateTab = document.getElementById("menu-duplicate-tab");
 const menuPinTab = document.getElementById("menu-pin-tab");
 const menuReopenClosed = document.getElementById("menu-reopen-closed");
@@ -168,6 +285,16 @@ const btnExitFullscreen = document.getElementById("btn-exit-fullscreen");
 
 const bookmarksBarEl = document.getElementById("bookmarks-bar");
 const bookmarksListEl = document.getElementById("bookmarks-list");
+
+// Games Hub DOM
+const gamesModal = document.getElementById("games-modal");
+const gamesTotalBadge = document.getElementById("games-total-badge");
+const btnGamesClose = document.getElementById("btn-games-close");
+const gamesSearchInput = document.getElementById("games-search-input");
+const gamesCategoriesEl = document.getElementById("games-categories");
+const gamesGridEl = document.getElementById("games-grid");
+const gamesLoadMoreWrap = document.getElementById("games-load-more-wrap");
+const btnLoadMoreGames = document.getElementById("btn-load-more-games");
 
 // DevTools DOM
 const devtoolsDockEl = document.getElementById("devtools-dock");
@@ -228,7 +355,6 @@ let sharedHttpCache = null;
 const isLocalhost =
   location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
-// Default to "auto" so it automatically selects the working proxy
 let currentEngine = localStorage.getItem(STORAGE_KEYS.engine) || "auto";
 if (!ROUTE_LABELS[currentEngine]) currentEngine = "auto";
 
@@ -245,6 +371,12 @@ let historyEntries = loadJsonStorage(STORAGE_KEYS.history, []);
 const closedTabsStack = [];
 const devNetworkLogs = [];
 const devConsoleLogs = [];
+
+// Games State
+let allGamesCatalog = [...STARTER_GAMES];
+let gamesLoadedFromApi = false;
+let currentGameCategory = "all";
+let currentGamesRenderLimit = 48;
 
 const tabs = [];
 let activeTabId = null;
@@ -346,14 +478,12 @@ function escapeHtml(str) {
  * Apply & Persist Customizations
  */
 function applyCustomizationsFromStorage() {
-  // 1. Theme
   const theme = localStorage.getItem(STORAGE_KEYS.theme) || "midnight";
   htmlEl.setAttribute("data-theme", theme);
   themeGridEl.querySelectorAll(".theme-card").forEach((btn) => {
     btn.classList.toggle("is-active", btn.dataset.themeVal === theme);
   });
 
-  // 2. Accent & Glow
   const savedAccent = localStorage.getItem(STORAGE_KEYS.accentColor);
   if (savedAccent) {
     htmlEl.style.setProperty("--accent", savedAccent);
@@ -369,7 +499,6 @@ function applyCustomizationsFromStorage() {
   inputGlowIntensity.value = String(glowNum);
   glowValLabel.textContent = `${glowNum}%`;
 
-  // 3. Tab Cloak
   const cloakPreset = localStorage.getItem(STORAGE_KEYS.cloakPreset) || "default";
   const customTitle = localStorage.getItem(STORAGE_KEYS.customTitle) || "";
   const customFavicon = localStorage.getItem(STORAGE_KEYS.customFavicon) || "";
@@ -382,7 +511,6 @@ function applyCustomizationsFromStorage() {
     faviconEl.href = customFavicon || preset.icon;
   }
 
-  // 4. Wallpaper & Ambient Style
   const bgStyle = localStorage.getItem(STORAGE_KEYS.bgStyle) || "aurora";
   const bgUrl = localStorage.getItem(STORAGE_KEYS.bgUrl) || "";
   htmlEl.setAttribute("data-bg", bgStyle);
@@ -394,7 +522,6 @@ function applyCustomizationsFromStorage() {
     ambientBgEl.style.removeProperty("background-image");
   }
 
-  // 5. Density, Font, Bookmarks Bar, Panic URL
   const density = localStorage.getItem(STORAGE_KEYS.density) || "comfortable";
   const font = localStorage.getItem(STORAGE_KEYS.font) || "sans";
   const bbar = localStorage.getItem(STORAGE_KEYS.bookmarksBar) || "show";
@@ -421,11 +548,13 @@ function syncProxyRouteLabel() {
 }
 
 /**
- * Resolve User Input (Supports !g, !yt, !w, !ddg, !r, !gh, !b bangs, URLs, or Search)
+ * Resolve User Input
  */
 function resolveInput(rawInput) {
   const text = String(rawInput ?? "").trim();
   if (!text) return null;
+
+  if (text === "lucasprox://games") return "lucasprox://games";
 
   const parts = text.split(/\s+/);
   const firstWord = parts[0].toLowerCase();
@@ -803,7 +932,7 @@ async function registerServiceWorker() {
           once: true,
         })
       ),
-      new Promise((resolve) => setTimeout(resolve, 1500)),
+      new Promise((resolve) => setTimeout(resolve, 1200)),
     ]);
   }
 
@@ -921,6 +1050,10 @@ function createPageLifecyclePlugin(onTitle, onReady, onError) {
 }
 
 function buildServerEngineIframeSrc(targetUrl, engineKind) {
+  if (engineKind === "embed") {
+    return targetUrl;
+  }
+
   const params = new URLSearchParams();
   if (adblockEnabled) {
     params.set("adblock", "1");
@@ -934,7 +1067,7 @@ function buildServerEngineIframeSrc(targetUrl, engineKind) {
     return `/service/uv/${encoded}${qs}`;
   }
 
-  params.set("engine", engineKind);
+  params.set("engine", engineKind === "auto" ? "uv" : engineKind);
   params.set("url", targetUrl);
   return `/api/proxy?${params.toString()}`;
 }
@@ -975,6 +1108,10 @@ function createTab({ select = true, url = "", engine = currentEngine } = {}) {
   const iframe = document.createElement("iframe");
   iframe.className = "proxy-frame";
   iframe.setAttribute("title", `Tab ${tabCounter}`);
+  iframe.setAttribute(
+    "allow",
+    "autoplay; fullscreen; gamepad; pointer-lock; clipboard-read; clipboard-write"
+  );
   framesStageEl.appendChild(iframe);
 
   const tab = {
@@ -1145,8 +1282,7 @@ async function ensureTabScramjetFrame(tab) {
     },
     () => {
       tab.loading = false;
-      // Seamless automatic failover to Proxy 2 if Auto or Proxy 1 encounters an upstream issue
-      if ((tab.engine === "auto" || tab.engine === "scramjet") && tab.url) {
+      if (tab.url) {
         tab.iframe.src = buildServerEngineIframeSrc(tab.url, "uv");
       }
       renderUI();
@@ -1161,11 +1297,41 @@ async function ensureTabScramjetFrame(tab) {
 }
 
 /**
- * Navigate Tab (Auto-selects working proxy or uses currently cycled proxy)
+ * Domains known to embed directly with 60 FPS WebGL when unblocked
+ */
+const DIRECT_EMBED_DOMAINS = [
+  "html5.gamemonetize.co",
+  "html5.gamedistribution.com",
+  "classic.minecraft.net",
+  "play2048.co",
+  "slope-game.github.io",
+  "retro-bowl.github.io",
+  "chromedino.com",
+  "flappybird.io",
+  "freepacman.org",
+  "wordleunlimited.org",
+];
+
+function shouldDirectEmbedInAuto(urlStr) {
+  try {
+    const host = new URL(urlStr).hostname.toLowerCase();
+    return DIRECT_EMBED_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Navigate Tab (Guaranteed Load across all websites & games)
  */
 async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngine = null } = {}) {
   const targetUrl = resolveInput(rawInput);
   if (!targetUrl) return;
+
+  if (targetUrl === "lucasprox://games") {
+    openGamesHub();
+    return;
+  }
 
   let targetTab = tab || getActiveTab();
   if (!targetTab) {
@@ -1191,9 +1357,25 @@ async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngin
   heroInput.blur();
   renderUI();
 
-  if (engineToUse === "auto" || engineToUse === "scramjet") {
+  // Direct high-FPS embed for HTML5 game CDNs when in Auto or Direct mode
+  if (
+    engineToUse === "embed" ||
+    (engineToUse === "auto" && shouldDirectEmbedInAuto(targetUrl))
+  ) {
+    logNetworkEvent("GET", targetUrl, "embed");
+    targetTab.iframe.src = targetUrl;
+    return;
+  }
+
+  // If user explicitly chose Proxy 1 (Scramjet Wasm SW)
+  if (engineToUse === "scramjet") {
     try {
-      const sjFrame = await ensureTabScramjetFrame(targetTab);
+      const sjFrame = await Promise.race([
+        ensureTabScramjetFrame(targetTab),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("SW timeout")), 2500)
+        ),
+      ]);
       sjFrame.go(targetUrl);
       return;
     } catch {
@@ -1204,7 +1386,10 @@ async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngin
     }
   }
 
-  const serverSrc = buildServerEngineIframeSrc(targetUrl, engineToUse);
+  // In Auto mode (and Proxy 2 / Proxy 3 / Proxy 4 / Reader):
+  // Route immediately via server-rewritten proxy with escaped-asset recovery so pages never hang on white/grey screens!
+  const effectiveEngine = engineToUse === "auto" ? "uv" : engineToUse;
+  const serverSrc = buildServerEngineIframeSrc(targetUrl, effectiveEngine);
   logNetworkEvent("GET", targetUrl, engineToUse);
   targetTab.iframe.src = serverSrc;
 }
@@ -1365,7 +1550,6 @@ function renderShortcuts() {
     return card;
   });
 
-  // Add Chrome-style "+ Add shortcut" button at the end of the grid
   const addCard = document.createElement("div");
   addCard.className = "quick-card";
   addCard.tabIndex = 0;
@@ -1392,6 +1576,94 @@ function promptAddShortcut() {
   renderShortcuts();
 }
 
+/**
+ * Games Hub (1,100+ HTML5 Games & AAA Cloud Gaming)
+ */
+async function ensureGamesLoaded() {
+  if (gamesLoadedFromApi) return;
+  try {
+    const res = await fetch("/api/games");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (Array.isArray(data.games) && data.games.length > 0) {
+      allGamesCatalog = data.games;
+      gamesLoadedFromApi = true;
+      gamesTotalBadge.textContent = `${data.games.length.toLocaleString()}+ Games`;
+      if (!gamesModal.hidden) {
+        renderGamesGrid();
+      }
+    }
+  } catch {}
+}
+
+function openGamesHub() {
+  gamesModal.hidden = false;
+  currentGamesRenderLimit = 48;
+  renderGamesGrid();
+  gamesSearchInput.focus();
+  void ensureGamesLoaded();
+}
+
+function getFilteredGames() {
+  const q = gamesSearchInput.value.trim().toLowerCase();
+  return allGamesCatalog.filter((g) => {
+    const catMatch =
+      currentGameCategory === "all" || g.category === currentGameCategory;
+    if (!catMatch) return false;
+    if (!q) return true;
+    return (
+      g.title.toLowerCase().includes(q) ||
+      (g.badge && g.badge.toLowerCase().includes(q)) ||
+      (g.studio && g.studio.toLowerCase().includes(q))
+    );
+  });
+}
+
+function renderGamesGrid() {
+  const filtered = getFilteredGames();
+  const visible = filtered.slice(0, currentGamesRenderLimit);
+
+  gamesLoadMoreWrap.style.display =
+    filtered.length > currentGamesRenderLimit ? "flex" : "none";
+
+  const cards = visible.map((game) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `game-card ${game.category === "aaa" ? "game-card--aaa" : ""}`;
+
+    const thumbHtml = game.thumb
+      ? `<img src="${escapeHtml(game.thumb)}" alt="${escapeHtml(
+          game.title
+        )}" loading="lazy" />`
+      : `<span class="game-card__icon">${escapeHtml(
+          game.title[0] || "🎮"
+        )}</span>`;
+
+    btn.innerHTML = `
+      <div class="game-card__thumb">
+        ${thumbHtml}
+        <span class="game-card__badge">${escapeHtml(game.badge || "HTML5")}</span>
+      </div>
+      <div class="game-card__body">
+        <div class="game-card__title">${escapeHtml(game.title)}</div>
+        <div class="game-card__sub">${escapeHtml(
+          game.studio || "Instant Play"
+        )}</div>
+      </div>
+    `;
+
+    btn.addEventListener("click", () => {
+      gamesModal.hidden = true;
+      const forceEngine = game.directEmbed ? "embed" : null;
+      void navigateTo(game.url, { forceEngine });
+    });
+
+    return btn;
+  });
+
+  gamesGridEl.replaceChildren(...cards);
+}
+
 function updateOmniboxSuggestions(query) {
   const q = String(query || "").trim().toLowerCase();
   if (!q) {
@@ -1408,6 +1680,18 @@ function updateOmniboxSuggestions(query) {
         sub: tpl.split("/")[2],
         value: q.startsWith(bang) ? query : `${bang} ${query}`,
       });
+    }
+  }
+
+  // Match games in omnibox!
+  for (const g of allGamesCatalog.slice(0, 80)) {
+    if (g.title.toLowerCase().includes(q)) {
+      matches.push({
+        label: `🎮 ${g.title}`,
+        sub: g.badge || "Game",
+        value: g.url,
+      });
+      if (matches.length >= 4) break;
     }
   }
 
@@ -1494,6 +1778,11 @@ function cycleNextProxy() {
  */
 function getCommandPaletteActions() {
   return [
+    {
+      title: "🎮 Open Games Hub (1,100+ HTML5 & AAA Cloud Games)",
+      tag: "Games",
+      run: () => openGamesHub(),
+    },
     {
       title: "Switch Proxy Route (Cycle Next)",
       tag: ROUTE_LABELS[currentEngine] || "Auto",
@@ -1815,6 +2104,33 @@ heroForm.addEventListener("submit", (e) => {
   void navigateTo(heroInput.value);
 });
 
+btnGamesHub.addEventListener("click", () => openGamesHub());
+btnGamesClose.addEventListener("click", () => (gamesModal.hidden = true));
+gamesModal.addEventListener("click", (e) => {
+  if (e.target === gamesModal) gamesModal.hidden = true;
+});
+
+gamesSearchInput.addEventListener("input", () => {
+  currentGamesRenderLimit = 48;
+  renderGamesGrid();
+});
+
+gamesCategoriesEl.querySelectorAll(".game-cat-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    currentGameCategory = btn.dataset.cat;
+    currentGamesRenderLimit = 48;
+    gamesCategoriesEl.querySelectorAll(".game-cat-btn").forEach((b) => {
+      b.classList.toggle("is-active", b === btn);
+    });
+    renderGamesGrid();
+  });
+});
+
+btnLoadMoreGames.addEventListener("click", () => {
+  currentGamesRenderLimit += 72;
+  renderGamesGrid();
+});
+
 btnSwitchProxy.addEventListener("click", () => {
   cycleNextProxy();
 });
@@ -1859,11 +2175,7 @@ btnForward.addEventListener("click", () => {
 btnReload.addEventListener("click", () => {
   const active = getActiveTab();
   if (!active) return;
-  if (
-    (active.engine === "scramjet" || active.engine === "auto") &&
-    active.sjFrame &&
-    !active.showLaunchpad
-  ) {
+  if (active.engine === "scramjet" && active.sjFrame && !active.showLaunchpad) {
     active.loading = true;
     renderUI();
     active.sjFrame.reload();
@@ -1914,6 +2226,7 @@ document.addEventListener("click", () => {
 });
 
 menuNewTab.addEventListener("click", () => createTab({ select: true }));
+menuGames.addEventListener("click", () => openGamesHub());
 menuDuplicateTab.addEventListener("click", () => {
   const active = getActiveTab();
   if (active) {
@@ -2234,7 +2547,8 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault();
     triggerPanicRedirect();
   } else if (e.key === "Escape") {
-    if (!commandPaletteModal.hidden) commandPaletteModal.hidden = true;
+    if (!gamesModal.hidden) gamesModal.hidden = true;
+    else if (!commandPaletteModal.hidden) commandPaletteModal.hidden = true;
     else if (!customizeModal.hidden) customizeModal.hidden = true;
     else if (!historyDrawer.hidden) historyDrawer.hidden = true;
     else if (!notesDrawer.hidden) notesDrawer.hidden = true;
@@ -2249,6 +2563,7 @@ applyCustomizationsFromStorage();
 renderBookmarks();
 renderShortcuts();
 createTab({ select: true });
+void ensureGamesLoaded();
 
 void ensureEngineReady()
   .catch(() => {})

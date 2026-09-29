@@ -5,20 +5,8 @@ import zlib from "node:zlib";
 const httpAgent = new http.Agent({ keepAlive: true });
 const httpsAgent = new https.Agent({ keepAlive: true });
 
-const USER_AGENTS = {
-  default:
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  chrome:
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  safari:
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
-  iphone:
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
-  android:
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
-  bot:
-    "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-};
+const DEFAULT_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 const ADBLOCK_DOMAINS = [
   "doubleclick.net",
@@ -44,9 +32,6 @@ const ADBLOCK_DOMAINS = [
   "propellerads.com",
   "moatads.com",
   "quantserve.com",
-  "rubiconproject.com",
-  "openx.net",
-  "pubmatic.com",
 ];
 
 const STRIP_HEADERS = new Set([
@@ -68,6 +53,7 @@ const STRIP_HEADERS = new Set([
   "report-to",
   "reporting-endpoints",
   "clear-site-data",
+  "x-content-type-options",
 ]);
 
 export function uvEncode(str) {
@@ -134,7 +120,11 @@ function fetchUpstream(targetUrl, options = {}, redirectCount = 0) {
           res.resume();
           try {
             const nextUrl = new URL(location, targetUrl);
-            const nextHeaders = { ...options.headers, Host: nextUrl.host };
+            const nextHeaders = {
+              ...options.headers,
+              Host: nextUrl.host,
+              Referer: targetUrl.href,
+            };
             fetchUpstream(
               nextUrl,
               {
@@ -147,9 +137,7 @@ function fetchUpstream(targetUrl, options = {}, redirectCount = 0) {
               .then(resolve)
               .catch(reject);
             return;
-          } catch {
-            // Fall through if Location header is malformed
-          }
+          } catch {}
         }
         resolve({ res, finalUrl: targetUrl });
       }
@@ -203,7 +191,7 @@ function readStreamToBuffer(stream, maxBytes = 15 * 1024 * 1024) {
   });
 }
 
-function buildProxyUrl(rawUrl, baseUrl, engine, ua, adblock) {
+function buildProxyUrl(rawUrl, baseUrl, engine, adblock) {
   if (!rawUrl) return rawUrl;
   const trimmed = String(rawUrl).trim();
   if (
@@ -228,7 +216,6 @@ function buildProxyUrl(rawUrl, baseUrl, engine, ua, adblock) {
   }
 
   const params = new URLSearchParams();
-  if (ua && ua !== "default") params.set("ua", ua);
   if (adblock) params.set("adblock", "1");
   const suffix = params.toString() ? `?${params.toString()}` : "";
 
@@ -240,35 +227,37 @@ function buildProxyUrl(rawUrl, baseUrl, engine, ua, adblock) {
   return `/api/proxy?${params.toString()}`;
 }
 
-function rewriteCss(cssText, baseUrl, engine, ua, adblock) {
+function rewriteCss(cssText, baseUrl, engine, adblock) {
   return String(cssText)
     .replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (match, quote, urlVal) => {
-      const rewritten = buildProxyUrl(urlVal, baseUrl, engine, ua, adblock);
+      const rewritten = buildProxyUrl(urlVal, baseUrl, engine, adblock);
       return `url(${quote}${rewritten}${quote})`;
     })
     .replace(/@import\s+(['"])([^'"]+)\1/gi, (match, quote, urlVal) => {
-      const rewritten = buildProxyUrl(urlVal, baseUrl, engine, ua, adblock);
+      const rewritten = buildProxyUrl(urlVal, baseUrl, engine, adblock);
       return `@import ${quote}${rewritten}${quote}`;
     });
 }
 
-function buildInjectedRuntimeScript(finalUrlHref, engine, ua, adblock) {
+function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
   const configJson = JSON.stringify({
     baseUrl: finalUrlHref,
     engine: engine || "direct",
-    ua: ua || "default",
     adblock: Boolean(adblock),
   });
 
   return `<script data-lucasprox-injected="1">
 (function(){
   const CFG = ${configJson};
+  const TARGET_URL = new URL(CFG.baseUrl);
+
   function uvEncode(str) {
     if (!str) return "";
     return encodeURIComponent(
       String(str).split("").map((ch, idx) => idx % 2 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch).join("")
     );
   }
+
   function wrapUrl(raw, base) {
     if (!raw) return raw;
     const s = String(raw).trim();
@@ -276,23 +265,25 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, ua, adblock) {
       return raw;
     }
     try {
-      const resolved = new URL(s, base || CFG.baseUrl).href;
+      let resolved;
+      if (s.startsWith("//")) {
+        resolved = TARGET_URL.protocol + s;
+      } else if (s.startsWith("/")) {
+        resolved = TARGET_URL.origin + s;
+      } else {
+        resolved = new URL(s, base || CFG.baseUrl).href;
+      }
       if (resolved.startsWith(location.origin + "/")) {
         const subPath = resolved.slice(location.origin.length);
         if (subPath.startsWith("/api/") || subPath.startsWith("/service/")) return raw;
-        const originBase = new URL(CFG.baseUrl).origin;
-        return wrapUrl(originBase + subPath, CFG.baseUrl);
+        resolved = TARGET_URL.origin + subPath;
       }
       if (CFG.engine === "uv") {
-        const q = [];
-        if (CFG.ua && CFG.ua !== "default") q.push("ua=" + encodeURIComponent(CFG.ua));
-        if (CFG.adblock) q.push("adblock=1");
-        return "/service/uv/" + uvEncode(resolved) + (q.length ? "?" + q.join("&") : "");
+        return "/service/uv/" + uvEncode(resolved) + (CFG.adblock ? "?adblock=1" : "");
       }
       const p = new URLSearchParams();
       p.set("engine", CFG.engine);
       p.set("url", resolved);
-      if (CFG.ua && CFG.ua !== "default") p.set("ua", CFG.ua);
       if (CFG.adblock) p.set("adblock", "1");
       return "/api/proxy?" + p.toString();
     } catch {
@@ -300,13 +291,73 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, ua, adblock) {
     }
   }
 
+  // Prevent History pushState/replaceState from crashing SPA routers (React/Next/Vue)
+  const origPushState = history.pushState;
+  const origReplaceState = history.replaceState;
+  history.pushState = function(state, title, url) {
+    try {
+      if (url) {
+        const proxied = wrapUrl(String(url), CFG.baseUrl);
+        return origPushState.call(this, state, title, proxied);
+      }
+      return origPushState.apply(this, arguments);
+    } catch {
+      return undefined;
+    }
+  };
+  history.replaceState = function(state, title, url) {
+    try {
+      if (url) {
+        const proxied = wrapUrl(String(url), CFG.baseUrl);
+        return origReplaceState.call(this, state, title, proxied);
+      }
+      return origReplaceState.apply(this, arguments);
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Intercept setAttribute for dynamic scripts, images, links, iframes
+  const origSetAttr = Element.prototype.setAttribute;
+  Element.prototype.setAttribute = function(name, value) {
+    const lower = String(name || "").toLowerCase();
+    if (lower === "integrity" || lower === "crossorigin" || lower === "nonce") {
+      return;
+    }
+    if (lower === "src" || lower === "href" || lower === "action" || lower === "poster") {
+      value = wrapUrl(value, CFG.baseUrl);
+    }
+    return origSetAttr.call(this, name, value);
+  };
+
+  // Intercept direct .src and .href property assignments on DOM elements
+  function hookUrlProperty(Proto, prop) {
+    if (!Proto) return;
+    const desc = Object.getOwnPropertyDescriptor(Proto.prototype, prop);
+    if (!desc || !desc.set) return;
+    Object.defineProperty(Proto.prototype, prop, {
+      get: desc.get,
+      set(val) {
+        desc.set.call(this, wrapUrl(val, CFG.baseUrl));
+      },
+      configurable: true,
+      enumerable: true,
+    });
+  }
+  hookUrlProperty(window.HTMLScriptElement, "src");
+  hookUrlProperty(window.HTMLImageElement, "src");
+  hookUrlProperty(window.HTMLLinkElement, "href");
+  hookUrlProperty(window.HTMLIFrameElement, "src");
+  hookUrlProperty(window.HTMLMediaElement, "src");
+  hookUrlProperty(window.HTMLSourceElement, "src");
+
   // Notify parent frame of URL and Title
   function notifyParent() {
     try {
       window.parent.postMessage({
         type: "lucasprox:page-state",
         url: CFG.baseUrl,
-        title: document.title || CFG.baseUrl,
+        title: document.title || TARGET_URL.hostname,
         engine: CFG.engine
       }, "*");
     } catch {}
@@ -315,7 +366,7 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, ua, adblock) {
   window.addEventListener("load", notifyParent);
   setTimeout(notifyParent, 150);
 
-  // Forward console events to LucasProx DevTools
+  // Forward console events
   ["log", "info", "warn", "error"].forEach((level) => {
     const orig = console[level];
     console[level] = function(...args) {
@@ -364,6 +415,14 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, ua, adblock) {
     }
   };
 
+  // Intercept WebWorker
+  const OrigWorker = window.Worker;
+  if (OrigWorker) {
+    window.Worker = function(scriptURL, options) {
+      return new OrigWorker(wrapUrl(String(scriptURL), CFG.baseUrl), options);
+    };
+  }
+
   // Intercept window.open
   const origWinOpen = window.open;
   window.open = function(url) {
@@ -410,23 +469,32 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, ua, adblock) {
 </script>`;
 }
 
-function rewriteHtml(htmlText, finalUrl, engine, ua, adblock) {
+function rewriteHtml(htmlText, finalUrl, engine, adblock) {
   const baseUrl = finalUrl.href;
   let output = String(htmlText);
 
-  // Remove existing CSP or base tags that could conflict
+  // Strip CSP, X-Frame, SRI integrity, and crossorigin attributes that block proxied execution
   output = output.replace(
-    /<meta[^>]+http-equiv\s*=\s*['"]?content-security-policy['"]?[^>]*>/gi,
+    /<meta[^>]+http-equiv\s*=\s*['"]?(?:content-security-policy|x-frame-options|refresh)['"]?[^>]*>/gi,
     ""
   );
+  output = output.replace(/<base[^>]*>/gi, "");
   output = output.replace(/\sintegrity\s*=\s*(['"])[^'"]*\1/gi, "");
   output = output.replace(/\scrossorigin(?:\s*=\s*(['"])[^'"]*\1)?/gi, "");
+  output = output.replace(/\snonce\s*=\s*(['"])[^'"]*\1/gi, "");
 
-  // Rewrite standard URL attributes: href, src, action, poster, data-src
+  // Neutralize common JS frame-busting patterns
+  output = output.replace(/\btop\.location\b/g, "self.location");
+  output = output.replace(/\bparent\.location\b/g, "self.location");
+  output = output.replace(/window\.top\s*!==?\s*window\.self/g, "false");
+  output = output.replace(/window\.self\s*!==?\s*window\.top/g, "false");
+  output = output.replace(/top\s*!==?\s*self/g, "false");
+
+  // Rewrite standard URL attributes (both double and single quoted)
   output = output.replace(
-    /\b(href|src|action|poster|data-src)\s*=\s*(['"])([^'"]+)\2/gi,
+    /\b(href|src|action|poster|data-src|data-href)\s*=\s*(['"])([^'"]+)\2/gi,
     (match, attr, quote, val) => {
-      const rewritten = buildProxyUrl(val, baseUrl, engine, ua, adblock);
+      const rewritten = buildProxyUrl(val, baseUrl, engine, adblock);
       return `${attr}=${quote}${rewritten}${quote}`;
     }
   );
@@ -442,28 +510,40 @@ function rewriteHtml(htmlText, finalUrl, engine, ua, adblock) {
           if (!trimmed) return "";
           const spaceIdx = trimmed.search(/\s/);
           if (spaceIdx === -1) {
-            return buildProxyUrl(trimmed, baseUrl, engine, ua, adblock);
+            return buildProxyUrl(trimmed, baseUrl, engine, adblock);
           }
           const urlPart = trimmed.slice(0, spaceIdx);
           const descPart = trimmed.slice(spaceIdx);
-          return `${buildProxyUrl(urlPart, baseUrl, engine, ua, adblock)}${descPart}`;
+          return `${buildProxyUrl(urlPart, baseUrl, engine, adblock)}${descPart}`;
         })
         .filter(Boolean);
       return `srcset=${quote}${parts.join(", ")}${quote}`;
     }
   );
 
-  // Rewrite inline styleblocks
+  // Rewrite inline style blocks
   output = output.replace(
     /(<style[^>]*>)([\s\S]*?)(<\/style>)/gi,
     (match, openTag, cssContent, closeTag) =>
-      `${openTag}${rewriteCss(cssContent, baseUrl, engine, ua, adblock)}${closeTag}`
+      `${openTag}${rewriteCss(cssContent, baseUrl, engine, adblock)}${closeTag}`
   );
 
-  // Strip target="_top" / "_parent" / "_blank" so navigation stays inside proxy frame
-  output = output.replace(/\btarget\s*=\s*(['"])_(?:top|parent|blank)\1/gi, 'target="_self"');
+  // Rewrite inline style="...url(...)..."
+  output = output.replace(
+    /\bstyle\s*=\s*(['"])([\s\S]*?)\1/gi,
+    (match, quote, styleText) => {
+      if (!styleText.toLowerCase().includes("url(")) return match;
+      return `style=${quote}${rewriteCss(styleText, baseUrl, engine, adblock)}${quote}`;
+    }
+  );
 
-  const runtimeScript = buildInjectedRuntimeScript(baseUrl, engine, ua, adblock);
+  // Keep links inside proxy frame
+  output = output.replace(
+    /\btarget\s*=\s*(['"])_(?:top|parent|blank)\1/gi,
+    'target="_self"'
+  );
+
+  const runtimeScript = buildInjectedRuntimeScript(baseUrl, engine, adblock);
   if (/<head[^>]*>/i.test(output)) {
     output = output.replace(/<head[^>]*>/i, (m) => `${m}${runtimeScript}`);
   } else {
@@ -473,14 +553,13 @@ function rewriteHtml(htmlText, finalUrl, engine, ua, adblock) {
   return output;
 }
 
-function renderReaderModeHtml(rawHtml, finalUrl, ua, adblock) {
+function renderReaderModeHtml(rawHtml, finalUrl, adblock) {
   const html = String(rawHtml);
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const rawTitle = titleMatch
     ? titleMatch[1].replace(/\s+/g, " ").trim()
     : finalUrl.hostname;
 
-  // Strip scripts, styles, nav, footer, svg, noscript, iframe
   let cleaned = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -490,7 +569,6 @@ function renderReaderModeHtml(rawHtml, finalUrl, ua, adblock) {
     .replace(/<nav[\s\S]*?<\/nav>/gi, "")
     .replace(/<footer[\s\S]*?<\/footer>/gi, "");
 
-  // Prefer <article> or <main> if present
   const articleMatch =
     cleaned.match(/<article[^>]*>([\s\S]*?)<\/article>/i) ||
     cleaned.match(/<main[^>]*>([\s\S]*?)<\/main>/i) ||
@@ -498,29 +576,27 @@ function renderReaderModeHtml(rawHtml, finalUrl, ua, adblock) {
 
   let bodyHtml = articleMatch ? articleMatch[1] : cleaned;
 
-  // Rewrite links and images inside reader view to stay proxied in reader mode
   bodyHtml = bodyHtml.replace(
     /\b(href|src)\s*=\s*(['"])([^'"]+)\2/gi,
     (match, attr, quote, val) => {
       const mode = attr.toLowerCase() === "href" ? "reader" : "direct";
-      const proxied = buildProxyUrl(val, finalUrl.href, mode, ua, adblock);
+      const proxied = buildProxyUrl(val, finalUrl.href, mode, adblock);
       return `${attr}=${quote}${proxied}${quote}`;
     }
   );
 
-  // Calculate rough word count & reading time
   const plainText = bodyHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   const wordCount = plainText ? plainText.split(" ").length : 0;
   const readingMinutes = Math.max(1, Math.round(wordCount / 200));
 
-  const fullModeUrl = buildProxyUrl(finalUrl.href, finalUrl.href, "uv", ua, adblock);
+  const fullModeUrl = buildProxyUrl(finalUrl.href, finalUrl.href, "uv", adblock);
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${rawTitle} • LucasProx Reader</title>
+  <title>${rawTitle}</title>
   <style>
     :root {
       color-scheme: dark;
@@ -529,7 +605,6 @@ function renderReaderModeHtml(rawHtml, finalUrl, ua, adblock) {
       --border: rgba(255,255,255,0.09);
       --text: #e8ecf4;
       --muted: #94a0b8;
-      --accent: #7c5cff;
     }
     * { box-sizing: border-box; }
     body {
@@ -599,34 +674,24 @@ function renderReaderModeHtml(rawHtml, finalUrl, ua, adblock) {
     .reader-content a {
       color: #65d2ff;
     }
-    .reader-content pre, .reader-content code {
-      background: rgba(0,0,0,0.35);
-      border-radius: 6px;
-      padding: 2px 6px;
-      overflow-x: auto;
-      font-size: 0.92em;
-    }
-    .reader-content pre {
-      padding: 14px;
-    }
   </style>
 </head>
 <body>
   <div class="reader-shell">
     <div class="reader-bar">
       <div>
-        <span class="reader-badge">⚡ LucasProx ReaderLite</span>
+        <span class="reader-badge">Reader View</span>
         <span style="margin-left:10px;">${wordCount.toLocaleString()} words • ~${readingMinutes} min read</span>
       </div>
       <div class="reader-actions">
-        <a href="${fullModeUrl}">Switch to Full Proxy View →</a>
+        <a href="${fullModeUrl}">Exit Reader View →</a>
       </div>
     </div>
     <h1 class="reader-title">${rawTitle}</h1>
     <div class="reader-domain">${finalUrl.href}</div>
     <div class="reader-content">${bodyHtml}</div>
   </div>
-  ${buildInjectedRuntimeScript(finalUrl.href, "reader", ua, adblock)}
+  ${buildInjectedRuntimeScript(finalUrl.href, "reader", adblock)}
 </body>
 </html>`;
 }
@@ -635,7 +700,7 @@ export default async function proxyHandler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "*");
-  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   res.setHeader("X-Robots-Tag", "noindex, nofollow");
 
   if (req.method === "OPTIONS") {
@@ -647,12 +712,10 @@ export default async function proxyHandler(req, res) {
   try {
     const reqUrl = new URL(req.url || "/", "http://localhost");
     let engine = (reqUrl.searchParams.get("engine") || "direct").toLowerCase();
-    const uaKey = (reqUrl.searchParams.get("ua") || "default").toLowerCase();
     const adblock = reqUrl.searchParams.get("adblock") === "1";
 
     let rawTarget = reqUrl.searchParams.get("url") || "";
 
-    // Support /service/uv/<xor_encoded_url> path routing
     if (!rawTarget && reqUrl.pathname.startsWith("/service/uv/")) {
       engine = "uv";
       const encodedPart = reqUrl.pathname.slice("/service/uv/".length);
@@ -662,12 +725,7 @@ export default async function proxyHandler(req, res) {
     if (!rawTarget) {
       res.setHeader("content-type", "application/json");
       res.writeHead(400);
-      res.end(
-        JSON.stringify({
-          error: "Missing target URL",
-          engines: ["scramjet", "uv", "aero", "direct", "reader"],
-        })
-      );
+      res.end(JSON.stringify({ error: "Missing target URL" }));
       return;
     }
 
@@ -678,24 +736,22 @@ export default async function proxyHandler(req, res) {
       targetUrl = new URL(`https://${rawTarget}`);
     }
 
-    // Ad & Tracker Blocker check
     if (adblock && isBlockedDomain(targetUrl.hostname)) {
-      res.setHeader("x-lucasprox-blocked", "1");
       res.writeHead(204);
       res.end();
       return;
     }
 
-    const userAgent = USER_AGENTS[uaKey] || USER_AGENTS.default;
     const sendHeaders = {
       Host: targetUrl.host,
-      "User-Agent": userAgent,
+      "User-Agent": DEFAULT_UA,
       Accept:
         req.headers["accept"] ||
         "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
       "Accept-Language": req.headers["accept-language"] || "en-US,en;q=0.9",
       "Accept-Encoding": "gzip, deflate, br",
       Referer: targetUrl.origin + "/",
+      Origin: targetUrl.origin,
     };
 
     if (req.headers["content-type"]) {
@@ -723,28 +779,30 @@ export default async function proxyHandler(req, res) {
       if (lower === "set-cookie") continue;
       try {
         res.setHeader(k, v);
-      } catch {
-        // Ignore invalid upstream headers
-      }
+      } catch {}
     }
 
-    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
-    res.setHeader("X-LucasProx-Engine", engine);
-    res.setHeader("X-LucasProx-Final-Url", finalUrl.href);
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Access-Control-Allow-Origin", "*");
 
     const stream = createDecompressedStream(upstreamRes);
 
-    // Rewrite HTML or CSS documents
     if (
       contentType.includes("text/html") ||
       contentType.includes("application/xhtml+xml")
     ) {
+      // Remember current target origin in a cookie so any un-rewritten root-relative assets (/assets/..., /_next/...) can be auto-proxied by server.js!
+      res.setHeader(
+        "Set-Cookie",
+        `__lp_origin=${encodeURIComponent(finalUrl.origin)}; Path=/; SameSite=Lax`
+      );
+
       const buf = await readStreamToBuffer(stream);
       const rawHtml = buf.toString("utf-8");
       const rewrittenHtml =
         engine === "reader"
-          ? renderReaderModeHtml(rawHtml, finalUrl, uaKey, adblock)
-          : rewriteHtml(rawHtml, finalUrl, engine, uaKey, adblock);
+          ? renderReaderModeHtml(rawHtml, finalUrl, adblock)
+          : rewriteHtml(rawHtml, finalUrl, engine, adblock);
 
       res.setHeader("content-type", "text/html; charset=utf-8");
       res.writeHead(statusCode);
@@ -755,14 +813,13 @@ export default async function proxyHandler(req, res) {
     if (contentType.includes("text/css")) {
       const buf = await readStreamToBuffer(stream);
       const rawCss = buf.toString("utf-8");
-      const rewrittenCss = rewriteCss(rawCss, finalUrl.href, engine, uaKey, adblock);
+      const rewrittenCss = rewriteCss(rawCss, finalUrl.href, engine, adblock);
       res.setHeader("content-type", "text/css; charset=utf-8");
       res.writeHead(statusCode);
       res.end(rewrittenCss);
       return;
     }
 
-    // Stream binary / JSON / JS / media assets directly
     res.writeHead(statusCode);
     stream.on("error", () => {
       if (!res.writableEnded) res.end();
@@ -775,19 +832,19 @@ export default async function proxyHandler(req, res) {
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Proxy Connection Error • LucasProx</title>
+  <title>Site Temporarily Unavailable</title>
   <style>
-    body { margin:0; min-height:100vh; display:grid; place-items:center; background:#090a0f; color:#f3f5fa; font-family:system-ui,sans-serif; padding:24px; }
-    .card { max-width:520px; background:#121521; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:28px; text-align:center; }
-    h2 { margin:0 0 10px; color:#ff6b81; }
-    p { color:#9aa4bc; line-height:1.5; font-size:14px; }
-    code { display:block; margin:14px 0; padding:10px; background:rgba(0,0,0,0.35); border-radius:8px; color:#ffb8c6; font-size:12px; word-break:break-all; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; background:#121318; color:#f1f3f9; font-family:system-ui,sans-serif; padding:24px; }
+    .card { max-width:480px; background:#1e2028; border:1px solid rgba(255,255,255,0.09); border-radius:16px; padding:28px; text-align:center; }
+    h2 { margin:0 0 10px; color:#f43f5e; font-size:20px; }
+    p { color:#9aa0b4; line-height:1.5; font-size:14px; }
+    code { display:block; margin:14px 0 0; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px; color:#fda4af; font-size:12px; word-break:break-all; }
   </style>
 </head>
 <body>
   <div class="card">
     <h2>Site Temporarily Unavailable</h2>
-    <p>This site didn't respond on the current proxy route. Click <strong>Switch Proxy</strong> in the top bar to try another route.</p>
+    <p>This site didn't respond on the current route. Click the <strong>Proxy</strong> button in the top bar to switch routes.</p>
     <code>${String(err?.message || err).replace(/[<>&]/g, "")}</code>
   </div>
 </body>

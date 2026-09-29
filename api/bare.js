@@ -11,6 +11,7 @@ const CORS_HEADERS = {
   "access-control-allow-methods": "*",
   "access-control-expose-headers": "*",
   "access-control-max-age": "7200",
+  "cross-origin-resource-policy": "cross-origin",
 };
 
 const FORBIDDEN_SEND_HEADERS = new Set([
@@ -20,6 +21,7 @@ const FORBIDDEN_SEND_HEADERS = new Set([
   "keep-alive",
   "upgrade",
   "http2-settings",
+  "host",
 ]);
 
 const STRIP_RESPONSE_HEADERS = new Set([
@@ -45,9 +47,13 @@ const STRIP_RESPONSE_HEADERS = new Set([
   "cross-origin-opener-policy",
   "cross-origin-embedder-policy",
   "cross-origin-resource-policy",
+  "x-content-type-options",
 ]);
 
 const NULL_BODY_STATUS = new Set([101, 204, 205, 304]);
+
+const DEFAULT_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 const httpAgent = new http.Agent({ keepAlive: true });
 const httpsAgent = new https.Agent({ keepAlive: true });
@@ -91,33 +97,99 @@ function collectBareResponseHeaders(res) {
     if (STRIP_RESPONSE_HEADERS.has(lower)) continue;
     result[lower] = val;
   }
+  result["access-control-allow-origin"] = "*";
+  result["cross-origin-resource-policy"] = "cross-origin";
   return result;
 }
 
-function performUpstreamRequest(remoteUrl, method, sendHeaders, incomingReq) {
+function readIncomingBody(req, maxBytes = 8 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on("data", (c) => {
+      size += c.length;
+      if (size <= maxBytes) chunks.push(c);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
+function performUpstreamRequest(
+  remoteUrl,
+  method,
+  sendHeaders,
+  bodyBuffer,
+  redirectCount = 0
+) {
+  return new Promise((resolve, reject) => {
+    if (redirectCount > 6) {
+      reject(new Error("Too many upstream redirects"));
+      return;
+    }
+
     const isHttps = remoteUrl.protocol === "https:";
     const requestFn = isHttps ? https.request : http.request;
 
+    const headersForHop = {
+      ...sendHeaders,
+      Host: remoteUrl.host,
+    };
+
     const outgoing = requestFn(remoteUrl, {
       method,
-      headers: sendHeaders,
+      headers: headersForHop,
       setHost: false,
       agent: isHttps ? httpsAgent : httpAgent,
       timeout: 25000,
     });
 
-    outgoing.on("response", (res) => resolve(res));
+    outgoing.on("response", (res) => {
+      const status = res.statusCode || 200;
+      const location = res.headers.location;
+
+      // Automatically follow redirects for GET/HEAD/303 so Service Workers never stall on 301/302
+      if (
+        [301, 302, 303, 307, 308].includes(status) &&
+        location &&
+        (method === "GET" || method === "HEAD" || status === 303)
+      ) {
+        res.resume();
+        try {
+          const nextUrl = new URL(location, remoteUrl);
+          const nextMethod = status === 303 ? "GET" : method;
+          const nextHeaders = {
+            ...sendHeaders,
+            Host: nextUrl.host,
+            Referer: remoteUrl.href,
+          };
+          performUpstreamRequest(
+            nextUrl,
+            nextMethod,
+            nextHeaders,
+            status === 303 ? null : bodyBuffer,
+            redirectCount + 1
+          )
+            .then(resolve)
+            .catch(reject);
+          return;
+        } catch {
+          // If Location URL is invalid, return as-is
+        }
+      }
+
+      resolve({ res, finalUrl: remoteUrl });
+    });
+
     outgoing.on("timeout", () => {
       outgoing.destroy(new Error("Upstream request timed out"));
     });
     outgoing.on("error", (err) => reject(err));
 
-    if (method !== "GET" && method !== "HEAD") {
-      incomingReq.pipe(outgoing);
-    } else {
-      outgoing.end();
+    if (bodyBuffer && bodyBuffer.length > 0 && method !== "GET" && method !== "HEAD") {
+      outgoing.write(bodyBuffer);
     }
+    outgoing.end();
   });
 }
 
@@ -142,8 +214,8 @@ export default async function handler(req, res) {
         language: "NodeJS",
         memoryUsage: 0,
         project: {
-          name: "LucasProx Bare V3 Server",
-          description: "Vercel Serverless Bare V3 HTTP Proxy",
+          name: "LucasProx Tunnel",
+          description: "High-Speed HTTP Proxy",
           version: "3.0.0",
         },
       });
@@ -167,23 +239,43 @@ export default async function handler(req, res) {
       const lower = key.toLowerCase();
       if (FORBIDDEN_SEND_HEADERS.has(lower) || lower.startsWith(":")) continue;
       if (typeof value === "string" || Array.isArray(value)) {
-        sendHeaders[key] = value;
+        // Rewrite Origin and Referer to target origin so sites don't reject requests
+        if (lower === "origin") {
+          sendHeaders[key] = remoteUrl.origin;
+        } else if (lower === "referer") {
+          sendHeaders[key] = remoteUrl.href;
+        } else {
+          sendHeaders[key] = value;
+        }
       }
+    }
+
+    if (!sendHeaders["User-Agent"] && !sendHeaders["user-agent"]) {
+      sendHeaders["User-Agent"] = DEFAULT_USER_AGENT;
+    }
+    if (!sendHeaders["Accept"] && !sendHeaders["accept"]) {
+      sendHeaders["Accept"] =
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
+    }
+    if (!sendHeaders["Accept-Language"] && !sendHeaders["accept-language"]) {
+      sendHeaders["Accept-Language"] =
+        reqHeaders["accept-language"] || "en-US,en;q=0.9";
     }
 
     sendHeaders["Host"] = remoteUrl.host;
     sendHeaders["accept-encoding"] = "gzip, deflate, br";
 
-    if (!sendHeaders["accept-language"] && !sendHeaders["Accept-Language"]) {
-      const lang = reqHeaders["accept-language"];
-      if (lang) sendHeaders["Accept-Language"] = lang;
+    const method = (req.method || "GET").toUpperCase();
+    let bodyBuffer = null;
+    if (method !== "GET" && method !== "HEAD") {
+      bodyBuffer = await readIncomingBody(req);
     }
 
-    const upstreamRes = await performUpstreamRequest(
+    const { res: upstreamRes, finalUrl } = await performUpstreamRequest(
       remoteUrl,
-      req.method || "GET",
+      method,
       sendHeaders,
-      req
+      bodyBuffer
     );
 
     const statusCode = upstreamRes.statusCode || 200;
@@ -196,6 +288,7 @@ export default async function handler(req, res) {
     res.setHeader("cache-control", "no-store");
     res.setHeader("x-bare-status", String(statusCode));
     res.setHeader("x-bare-status-text", statusText);
+    res.setHeader("x-bare-final-url", finalUrl.href);
 
     if (bareHeadersStr.length > MAX_HEADER_VALUE) {
       let split = 0;
@@ -214,7 +307,7 @@ export default async function handler(req, res) {
 
     res.writeHead(200, "OK");
 
-    if (req.method === "HEAD" || NULL_BODY_STATUS.has(statusCode)) {
+    if (method === "HEAD" || NULL_BODY_STATUS.has(statusCode)) {
       upstreamRes.resume();
       res.end();
       return;
