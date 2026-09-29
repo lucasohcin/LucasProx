@@ -82,7 +82,7 @@ app.all("*", (req, res) => {
     const targetOrigin = extractProxiedOrigin(req);
     if (targetOrigin) {
       const resolvedUrl = `${targetOrigin}${req.originalUrl}`;
-      req.url = `/api/proxy?engine=direct&url=${encodeURIComponent(resolvedUrl)}`;
+      req.url = `/api/proxy?engine=uv&url=${encodeURIComponent(resolvedUrl)}`;
       void proxyHandler(req, res);
       return;
     }

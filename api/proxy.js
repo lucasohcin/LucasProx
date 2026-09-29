@@ -34,7 +34,7 @@ const ADBLOCK_DOMAINS = [
   "quantserve.com",
 ];
 
-const STRIP_HEADERS = new Set([
+const STRIP_RESPONSE_HEADERS = new Set([
   "content-encoding",
   "content-length",
   "transfer-encoding",
@@ -54,6 +54,44 @@ const STRIP_HEADERS = new Set([
   "reporting-endpoints",
   "clear-site-data",
   "x-content-type-options",
+  "alt-svc",
+]);
+
+const SKIP_REQUEST_HEADERS = new Set([
+  "host",
+  "connection",
+  "content-length",
+  "transfer-encoding",
+  "keep-alive",
+  "upgrade",
+  "accept-encoding",
+  "origin",
+  "referer",
+  "cookie",
+  "sec-fetch-site",
+  "sec-fetch-mode",
+  "sec-fetch-dest",
+  "sec-fetch-user",
+  "x-forwarded-for",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "x-forwarded-port",
+  "x-real-ip",
+  "x-vercel-id",
+  "x-vercel-deployment-url",
+  "x-vercel-forwarded-for",
+  "x-vercel-ip-city",
+  "x-vercel-ip-continent",
+  "x-vercel-ip-country",
+  "x-vercel-ip-country-region",
+  "x-vercel-ip-latitude",
+  "x-vercel-ip-longitude",
+  "x-vercel-ip-timezone",
+  "x-vercel-ja4-digest",
+  "x-vercel-proxied-for",
+  "x-vercel-sc-headers",
+  "x-vercel-sc-host",
+  "x-vercel-sc-basepath",
 ]);
 
 export function uvEncode(str) {
@@ -123,6 +161,7 @@ function fetchUpstream(targetUrl, options = {}, redirectCount = 0) {
             const nextHeaders = {
               ...options.headers,
               Host: nextUrl.host,
+              Origin: nextUrl.origin,
               Referer: targetUrl.href,
             };
             fetchUpstream(
@@ -239,17 +278,89 @@ function rewriteCss(cssText, baseUrl, engine, adblock) {
     });
 }
 
+/**
+ * Neutralize proxy/iframe detection & spoof hostname/origin checks inside JS code
+ */
+function rewriteJsAntiDetection(jsText) {
+  return String(jsText)
+    .replace(/window\.top\s*!==?\s*window\.self/g, "false")
+    .replace(/window\.self\s*!==?\s*window\.top/g, "false")
+    .replace(/window\.top\s*===\s*window\.self/g, "true")
+    .replace(/window\.self\s*===\s*window\.top/g, "true")
+    .replace(/\bwindow\.location\.hostname\b/g, "(window.__lpLoc?window.__lpLoc.hostname:window.location.hostname)")
+    .replace(/\bwindow\.location\.origin\b/g, "(window.__lpLoc?window.__lpLoc.origin:window.location.origin)")
+    .replace(/\bwindow\.location\.host\b/g, "(window.__lpLoc?window.__lpLoc.host:window.location.host)")
+    .replace(/\bdocument\.location\.hostname\b/g, "(window.__lpLoc?window.__lpLoc.hostname:document.location.hostname)")
+    .replace(/\bdocument\.location\.origin\b/g, "(window.__lpLoc?window.__lpLoc.origin:document.location.origin)");
+}
+
 function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
   const configJson = JSON.stringify({
     baseUrl: finalUrlHref,
-    engine: engine || "direct",
+    engine: engine || "uv",
     adblock: Boolean(adblock),
   });
 
   return `<script data-lucasprox-injected="1">
 (function(){
   const CFG = ${configJson};
-  const TARGET_URL = new URL(CFG.baseUrl);
+  let TARGET_URL = new URL(CFG.baseUrl);
+
+  const origPushState = History.prototype.pushState;
+  const origReplaceState = History.prototype.replaceState;
+
+  // CRITICAL FOR SPA ROUTERS (Xbox, Next.js, React Router, Vue, Angular):
+  // Immediately restore window.location.pathname + search + hash to the real target path
+  // BEFORE any page script executes so client-side routers match routes instead of showing 404 / "cannot be found"!
+  try {
+    const initialCleanPath = (TARGET_URL.pathname || "/") + (TARGET_URL.search || "") + (TARGET_URL.hash || "");
+    origReplaceState.call(history, history.state, "", initialCleanPath);
+  } catch {}
+
+  // Spoof location metadata & anti-bot properties so sites never detect proxy host
+  window.__lpLoc = {
+    get href() { return CFG.baseUrl; },
+    set href(v) { window.location.href = wrapUrl(v, CFG.baseUrl); },
+    get origin() { return TARGET_URL.origin; },
+    get protocol() { return TARGET_URL.protocol; },
+    get host() { return TARGET_URL.host; },
+    get hostname() { return TARGET_URL.hostname; },
+    get port() { return TARGET_URL.port; },
+    get pathname() { return TARGET_URL.pathname; },
+    get search() { return TARGET_URL.search; },
+    get hash() { return window.location.hash || TARGET_URL.hash; },
+    assign(v) { window.location.href = wrapUrl(v, CFG.baseUrl); },
+    replace(v) { window.location.replace(wrapUrl(v, CFG.baseUrl)); },
+    reload() { window.location.reload(); },
+    toString() { return CFG.baseUrl; }
+  };
+
+  try {
+    Object.defineProperty( navigator, "webdriver", { get: () => false, configurable: true });
+  } catch {}
+  try {
+    Object.defineProperty(document, "domain", {
+      get: () => TARGET_URL.hostname,
+      set: () => {},
+      configurable: true
+    });
+    Object.defineProperty(document, "referrer", {
+      get: () => TARGET_URL.origin + "/",
+      configurable: true
+    });
+    Object.defineProperty(document, "URL", {
+      get: () => CFG.baseUrl,
+      configurable: true
+    });
+    Object.defineProperty(document, "documentURI", {
+      get: () => CFG.baseUrl,
+      configurable: true
+    });
+    Object.defineProperty(window, "origin", {
+      get: () => TARGET_URL.origin,
+      configurable: true
+    });
+  } catch {}
 
   function uvEncode(str) {
     if (!str) return "";
@@ -258,25 +369,43 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
     );
   }
 
+  function resolveAgainstTarget(raw, base) {
+    const s = String(raw || "").trim();
+    if (!s) return CFG.baseUrl;
+    if (s.startsWith("//")) return TARGET_URL.protocol + s;
+    if (s.startsWith("/")) return TARGET_URL.origin + s;
+    const resolved = new URL(s, base || CFG.baseUrl).href;
+    if (resolved.startsWith(location.origin + "/")) {
+      const subPath = resolved.slice(location.origin.length);
+      if (!subPath.startsWith("/api/") && !subPath.startsWith("/service/")) {
+        return TARGET_URL.origin + subPath;
+      }
+    }
+    return resolved;
+  }
+
   function wrapUrl(raw, base) {
     if (!raw) return raw;
     const s = String(raw).trim();
-    if (!s || s.startsWith("#") || s.startsWith("data:") || s.startsWith("blob:") || s.startsWith("javascript:") || s.startsWith("mailto:") || s.startsWith("/api/proxy") || s.startsWith("/service/uv/") || s.startsWith(location.origin + "/api/proxy") || s.startsWith(location.origin + "/service/uv/")) {
+    if (
+      !s ||
+      s.startsWith("#") ||
+      s.startsWith("data:") ||
+      s.startsWith("blob:") ||
+      s.startsWith("javascript:") ||
+      s.startsWith("mailto:") ||
+      s.startsWith("tel:") ||
+      s.startsWith("/api/proxy") ||
+      s.startsWith("/service/uv/") ||
+      s.startsWith(location.origin + "/api/proxy") ||
+      s.startsWith(location.origin + "/service/uv/")
+    ) {
       return raw;
     }
     try {
-      let resolved;
-      if (s.startsWith("//")) {
-        resolved = TARGET_URL.protocol + s;
-      } else if (s.startsWith("/")) {
-        resolved = TARGET_URL.origin + s;
-      } else {
-        resolved = new URL(s, base || CFG.baseUrl).href;
-      }
-      if (resolved.startsWith(location.origin + "/")) {
-        const subPath = resolved.slice(location.origin.length);
-        if (subPath.startsWith("/api/") || subPath.startsWith("/service/")) return raw;
-        resolved = TARGET_URL.origin + subPath;
+      const resolved = resolveAgainstTarget(s, base);
+      if (resolved.startsWith(location.origin + "/api/") || resolved.startsWith(location.origin + "/service/")) {
+        return raw;
       }
       if (CFG.engine === "uv") {
         return "/service/uv/" + uvEncode(resolved) + (CFG.adblock ? "?adblock=1" : "");
@@ -291,30 +420,35 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
     }
   }
 
-  // Prevent History pushState/replaceState from crashing SPA routers (React/Next/Vue)
-  const origPushState = history.pushState;
-  const origReplaceState = history.replaceState;
-  history.pushState = function(state, title, url) {
+  // Keep window.location.pathname clean when SPA routers call pushState / replaceState
+  function handleSpaStateChange(origFn, state, title, url) {
     try {
-      if (url) {
-        const proxied = wrapUrl(String(url), CFG.baseUrl);
-        return origPushState.call(this, state, title, proxied);
+      if (url !== undefined && url !== null && String(url) !== "") {
+        const rawStr = String(url);
+        let nextTarget;
+        if (rawStr.startsWith("/service/uv/")) {
+          nextTarget = TARGET_URL;
+        } else {
+          nextTarget = new URL(resolveAgainstTarget(rawStr, CFG.baseUrl));
+        }
+        CFG.baseUrl = nextTarget.href;
+        TARGET_URL = nextTarget;
+        const cleanPath = (nextTarget.pathname || "/") + (nextTarget.search || "") + (nextTarget.hash || "");
+        const res = origFn.call(history, state, title, cleanPath);
+        notifyParent();
+        return res;
       }
-      return origPushState.apply(this, arguments);
+      return origFn.call(history, state, title);
     } catch {
       return undefined;
     }
+  }
+
+  History.prototype.pushState = function(state, title, url) {
+    return handleSpaStateChange(origPushState, state, title, url);
   };
-  history.replaceState = function(state, title, url) {
-    try {
-      if (url) {
-        const proxied = wrapUrl(String(url), CFG.baseUrl);
-        return origReplaceState.call(this, state, title, proxied);
-      }
-      return origReplaceState.apply(this, arguments);
-    } catch {
-      return undefined;
-    }
+  History.prototype.replaceState = function(state, title, url) {
+    return handleSpaStateChange(origReplaceState, state, title, url);
   };
 
   // Intercept setAttribute for dynamic scripts, images, links, iframes
@@ -332,7 +466,7 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
 
   // Intercept direct .src and .href property assignments on DOM elements
   function hookUrlProperty(Proto, prop) {
-    if (!Proto) return;
+    if (!Proto || !Proto.prototype) return;
     const desc = Object.getOwnPropertyDescriptor(Proto.prototype, prop);
     if (!desc || !desc.set) return;
     Object.defineProperty(Proto.prototype, prop, {
@@ -385,18 +519,22 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
     };
   });
 
-  // Intercept fetch
+  // Intercept fetch (preserving Request objects, custom headers, method, and body!)
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = function(input, init) {
       try {
         if (typeof input === "string" || input instanceof URL) {
-          const proxied = wrapUrl(String(input), CFG.baseUrl);
-          window.parent.postMessage({ type: "lucasprox:net", method: (init && init.method) || "GET", url: String(input), engine: CFG.engine }, "*");
+          const rawUrl = String(input);
+          const proxied = wrapUrl(rawUrl, CFG.baseUrl);
+          window.parent.postMessage({ type: "lucasprox:net", method: (init && init.method) || "GET", url: rawUrl, engine: CFG.engine }, "*");
           return origFetch.call(this, proxied, init);
-        } else if (input && typeof input.url === "string") {
-          const proxied = wrapUrl(input.url, CFG.baseUrl);
-          return origFetch.call(this, proxied, init);
+        } else if (input && typeof input === "object" && typeof input.url === "string") {
+          const rawUrl = input.url;
+          const proxied = wrapUrl(rawUrl, CFG.baseUrl);
+          window.parent.postMessage({ type: "lucasprox:net", method: (init && init.method) || input.method || "GET", url: rawUrl, engine: CFG.engine }, "*");
+          const clonedReq = new Request(proxied, input);
+          return origFetch.call(this, clonedReq, init);
         }
       } catch {}
       return origFetch.call(this, input, init);
@@ -414,6 +552,18 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
       return origOpen.call(this, method, url, ...rest);
     }
   };
+
+  // Intercept navigator.sendBeacon
+  if (navigator.sendBeacon) {
+    const origBeacon = navigator.sendBeacon.bind(navigator);
+    navigator.sendBeacon = function(url, data) {
+      try {
+        return origBeacon(wrapUrl(String(url), CFG.baseUrl), data);
+      } catch {
+        return false;
+      }
+    };
+  }
 
   // Intercept WebWorker
   const OrigWorker = window.Worker;
@@ -455,7 +605,7 @@ function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
     const rawAction = form.getAttribute("action") || CFG.baseUrl;
     if (method === "GET") {
       e.preventDefault();
-      const targetUrl = new URL(rawAction, CFG.baseUrl);
+      const targetUrl = new URL(resolveAgainstTarget(rawAction, CFG.baseUrl));
       const fd = new FormData(form);
       for (const [k, v] of fd.entries()) {
         targetUrl.searchParams.set(k, String(v));
@@ -483,14 +633,22 @@ function rewriteHtml(htmlText, finalUrl, engine, adblock) {
   output = output.replace(/\scrossorigin(?:\s*=\s*(['"])[^'"]*\1)?/gi, "");
   output = output.replace(/\snonce\s*=\s*(['"])[^'"]*\1/gi, "");
 
-  // Neutralize common JS frame-busting patterns
-  output = output.replace(/\btop\.location\b/g, "self.location");
-  output = output.replace(/\bparent\.location\b/g, "self.location");
-  output = output.replace(/window\.top\s*!==?\s*window\.self/g, "false");
-  output = output.replace(/window\.self\s*!==?\s*window\.top/g, "false");
-  output = output.replace(/top\s*!==?\s*self/g, "false");
+  // Protect inline <script> bodies (e.g., Next.js __NEXT_DATA__ JSON blobs) from HTML attribute regex corruption
+  const scriptBlocks = [];
+  output = output.replace(
+    /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_match, openTag, body, closeTag) => {
+      const idx = scriptBlocks.length;
+      const isJson = /type\s*=\s*(['"])application\/(?:ld\+)?json\1/i.test(openTag) || /id\s*=\s*(['"])__NEXT_DATA__\1/i.test(openTag);
+      scriptBlocks.push({
+        body: isJson ? body : rewriteJsAntiDetection(body),
+        closeTag,
+      });
+      return `${openTag}__LP_SCRIPT_BODY_${idx}__`;
+    }
+  );
 
-  // Rewrite standard URL attributes (both double and single quoted)
+  // Rewrite standard URL attributes on HTML tags (both double and single quoted)
   output = output.replace(
     /\b(href|src|action|poster|data-src|data-href)\s*=\s*(['"])([^'"]+)\2/gi,
     (match, attr, quote, val) => {
@@ -542,6 +700,12 @@ function rewriteHtml(htmlText, finalUrl, engine, adblock) {
     /\btarget\s*=\s*(['"])_(?:top|parent|blank)\1/gi,
     'target="_self"'
   );
+
+  // Restore inline <script> bodies
+  output = output.replace(/__LP_SCRIPT_BODY_(\d+)__/g, (_m, idxStr) => {
+    const item = scriptBlocks[Number(idxStr)];
+    return item ? `${item.body}${item.closeTag}` : "";
+  });
 
   const runtimeScript = buildInjectedRuntimeScript(baseUrl, engine, adblock);
   if (/<head[^>]*>/i.test(output)) {
@@ -696,11 +860,26 @@ function renderReaderModeHtml(rawHtml, finalUrl, adblock) {
 </html>`;
 }
 
+function sanitizeSetCookieHeaders(rawSetCookies) {
+  if (!rawSetCookies) return [];
+  const list = Array.isArray(rawSetCookies) ? rawSetCookies : [rawSetCookies];
+  return list
+    .map((cookieStr) =>
+      String(cookieStr)
+        .replace(/;\s*Domain=[^;]+/gi, "")
+        .replace(/;\s*SameSite=None/gi, "; SameSite=Lax")
+        .replace(/;\s*Secure/gi, "")
+        .replace(/;\s*Partitioned/gi, "")
+    )
+    .filter(Boolean);
+}
+
 export default async function proxyHandler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "*");
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
   res.setHeader("X-Robots-Tag", "noindex, nofollow");
 
   if (req.method === "OPTIONS") {
@@ -711,7 +890,7 @@ export default async function proxyHandler(req, res) {
 
   try {
     const reqUrl = new URL(req.url || "/", "http://localhost");
-    let engine = (reqUrl.searchParams.get("engine") || "direct").toLowerCase();
+    let engine = (reqUrl.searchParams.get("engine") || "uv").toLowerCase();
     const adblock = reqUrl.searchParams.get("adblock") === "1";
 
     let rawTarget = reqUrl.searchParams.get("url") || "";
@@ -742,25 +921,42 @@ export default async function proxyHandler(req, res) {
       return;
     }
 
-    const sendHeaders = {
-      Host: targetUrl.host,
-      "User-Agent": DEFAULT_UA,
-      Accept:
-        req.headers["accept"] ||
-        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-      "Accept-Language": req.headers["accept-language"] || "en-US,en;q=0.9",
-      "Accept-Encoding": "gzip, deflate, br",
-      Referer: targetUrl.origin + "/",
-      Origin: targetUrl.origin,
-    };
-
-    if (req.headers["content-type"]) {
-      sendHeaders["Content-Type"] = req.headers["content-type"];
+    // Forward custom API headers (e.g. ms-cv, calling-app-name, authorization, x-ms-api-version)
+    // so sites like Xbox Cloud, Twitch, Reddit, etc. never reject backend API fetches
+    const sendHeaders = Object.create(null);
+    for (const [k, v] of Object.entries(req.headers || {})) {
+      if (v === undefined) continue;
+      const lower = k.toLowerCase();
+      if (SKIP_REQUEST_HEADERS.has(lower) || lower.startsWith(":")) continue;
+      sendHeaders[k] = v;
     }
+
+    // Forward non-internal cookies
+    if (req.headers.cookie) {
+      const cleanedCookies = String(req.headers.cookie)
+        .split(";")
+        .map((c) => c.trim())
+        .filter((c) => c && !c.startsWith("__lp_origin="))
+        .join("; ");
+      if (cleanedCookies) {
+        sendHeaders["Cookie"] = cleanedCookies;
+      }
+    }
+
+    sendHeaders["Host"] = targetUrl.host;
+    sendHeaders["User-Agent"] = req.headers["user-agent"] || DEFAULT_UA;
+    sendHeaders["Accept"] =
+      req.headers["accept"] ||
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
+    sendHeaders["Accept-Language"] =
+      req.headers["accept-language"] || "en-US,en;q=0.9";
+    sendHeaders["Accept-Encoding"] = "gzip, deflate, br";
+    sendHeaders["Referer"] = targetUrl.href;
+    sendHeaders["Origin"] = targetUrl.origin;
 
     let reqBody = null;
     if (req.method !== "GET" && req.method !== "HEAD") {
-      reqBody = await readStreamToBuffer(req, 5 * 1024 * 1024);
+      reqBody = await readStreamToBuffer(req, 8 * 1024 * 1024);
     }
 
     const { res: upstreamRes, finalUrl } = await fetchUpstream(targetUrl, {
@@ -775,14 +971,17 @@ export default async function proxyHandler(req, res) {
     for (const [k, v] of Object.entries(upstreamRes.headers)) {
       if (v === undefined) continue;
       const lower = k.toLowerCase();
-      if (STRIP_HEADERS.has(lower)) continue;
+      if (STRIP_RESPONSE_HEADERS.has(lower)) continue;
       if (lower === "set-cookie") continue;
       try {
         res.setHeader(k, v);
       } catch {}
     }
 
+    const sanitizedCookies = sanitizeSetCookieHeaders(upstreamRes.headers["set-cookie"]);
+
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
     res.setHeader("Access-Control-Allow-Origin", "*");
 
     const stream = createDecompressedStream(upstreamRes);
@@ -792,10 +991,8 @@ export default async function proxyHandler(req, res) {
       contentType.includes("application/xhtml+xml")
     ) {
       // Remember current target origin in a cookie so any un-rewritten root-relative assets (/assets/..., /_next/...) can be auto-proxied by server.js!
-      res.setHeader(
-        "Set-Cookie",
-        `__lp_origin=${encodeURIComponent(finalUrl.origin)}; Path=/; SameSite=Lax`
-      );
+      const originCookie = `__lp_origin=${encodeURIComponent(finalUrl.origin)}; Path=/; SameSite=Lax`;
+      res.setHeader("Set-Cookie", [...sanitizedCookies, originCookie]);
 
       const buf = await readStreamToBuffer(stream);
       const rawHtml = buf.toString("utf-8");
@@ -810,6 +1007,10 @@ export default async function proxyHandler(req, res) {
       return;
     }
 
+    if (sanitizedCookies.length > 0) {
+      res.setHeader("Set-Cookie", sanitizedCookies);
+    }
+
     if (contentType.includes("text/css")) {
       const buf = await readStreamToBuffer(stream);
       const rawCss = buf.toString("utf-8");
@@ -817,6 +1018,19 @@ export default async function proxyHandler(req, res) {
       res.setHeader("content-type", "text/css; charset=utf-8");
       res.writeHead(statusCode);
       res.end(rewrittenCss);
+      return;
+    }
+
+    if (
+      contentType.includes("javascript") ||
+      contentType.includes("ecmascript")
+    ) {
+      const buf = await readStreamToBuffer(stream);
+      const rawJs = buf.toString("utf-8");
+      const rewrittenJs = rewriteJsAntiDetection(rawJs);
+      res.setHeader("content-type", contentType || "application/javascript; charset=utf-8");
+      res.writeHead(statusCode);
+      res.end(rewrittenJs);
       return;
     }
 
