@@ -1,17 +1,14 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "outputDirectory": "public",
-  "rewrites": [
-    {
-      "source": "/bare/:path*",
-      "destination": "/api/bare"
+  "functions": {
+    "server.js": {
+      "includeFiles": "public/**"
     },
-    {
-      "source": "/bare",
-      "destination": "/api/bare"
+    "api/*.js": {
+      "includeFiles": "public/**"
     }
-  ],
+  },
   "headers": [
     {
       "source": "/(.*)",
