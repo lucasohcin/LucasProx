@@ -279,19 +279,14 @@ function rewriteCss(cssText, baseUrl, engine, adblock) {
 }
 
 /**
- * Neutralize proxy/iframe detection & spoof hostname/origin checks inside JS code
+ * Neutralize iframe top-frame detection inside JS code without breaking member access expressions
  */
 function rewriteJsAntiDetection(jsText) {
   return String(jsText)
-    .replace(/window\.top\s*!==?\s*window\.self/g, "false")
-    .replace(/window\.self\s*!==?\s*window\.top/g, "false")
-    .replace(/window\.top\s*===\s*window\.self/g, "true")
-    .replace(/window\.self\s*===\s*window\.top/g, "true")
-    .replace(/\bwindow\.location\.hostname\b/g, "(window.__lpLoc?window.__lpLoc.hostname:window.location.hostname)")
-    .replace(/\bwindow\.location\.origin\b/g, "(window.__lpLoc?window.__lpLoc.origin:window.location.origin)")
-    .replace(/\bwindow\.location\.host\b/g, "(window.__lpLoc?window.__lpLoc.host:window.location.host)")
-    .replace(/\bdocument\.location\.hostname\b/g, "(window.__lpLoc?window.__lpLoc.hostname:document.location.hostname)")
-    .replace(/\bdocument\.location\.origin\b/g, "(window.__lpLoc?window.__lpLoc.origin:document.location.origin)");
+    .replace(/(?<![.\w$])window\.top\s*!==?\s*window\.self/g, "false")
+    .replace(/(?<![.\w$])window\.self\s*!==?\s*window\.top/g, "false")
+    .replace(/(?<![.\w$])window\.top\s*===\s*window\.self/g, "true")
+    .replace(/(?<![.\w$])window\.self\s*===\s*window\.top/g, "true");
 }
 
 function buildInjectedRuntimeScript(finalUrlHref, engine, adblock) {
@@ -932,16 +927,34 @@ export default async function proxyHandler(req, res) {
     }
 
     // Forward non-internal cookies
+    let pageOrigin = "";
     if (req.headers.cookie) {
-      const cleanedCookies = String(req.headers.cookie)
+      const parts = String(req.headers.cookie)
         .split(";")
-        .map((c) => c.trim())
+        .map((c) => c.trim());
+      for (const p of parts) {
+        if (p.startsWith("__lp_origin=")) {
+          try {
+            pageOrigin = decodeURIComponent(p.slice("__lp_origin=".length));
+          } catch {}
+        }
+      }
+      const cleanedCookies = parts
         .filter((c) => c && !c.startsWith("__lp_origin="))
         .join("; ");
       if (cleanedCookies) {
         sendHeaders["Cookie"] = cleanedCookies;
       }
     }
+
+    const isNavigateRequest =
+      req.headers["sec-fetch-mode"] === "navigate" ||
+      req.headers["sec-fetch-dest"] === "document" ||
+      req.headers["sec-fetch-dest"] === "iframe";
+    const effectiveOrigin =
+      !isNavigateRequest && pageOrigin && pageOrigin.startsWith("http")
+        ? pageOrigin
+        : targetUrl.origin;
 
     sendHeaders["Host"] = targetUrl.host;
     sendHeaders["User-Agent"] = req.headers["user-agent"] || DEFAULT_UA;
@@ -951,8 +964,9 @@ export default async function proxyHandler(req, res) {
     sendHeaders["Accept-Language"] =
       req.headers["accept-language"] || "en-US,en;q=0.9";
     sendHeaders["Accept-Encoding"] = "gzip, deflate, br";
-    sendHeaders["Referer"] = targetUrl.href;
-    sendHeaders["Origin"] = targetUrl.origin;
+    sendHeaders["Referer"] =
+      effectiveOrigin !== targetUrl.origin ? `${effectiveOrigin}/` : targetUrl.href;
+    sendHeaders["Origin"] = effectiveOrigin;
 
     let reqBody = null;
     if (req.method !== "GET" && req.method !== "HEAD") {

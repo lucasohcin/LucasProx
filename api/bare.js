@@ -115,19 +115,8 @@ function readIncomingBody(req, maxBytes = 8 * 1024 * 1024) {
   });
 }
 
-function performUpstreamRequest(
-  remoteUrl,
-  method,
-  sendHeaders,
-  bodyBuffer,
-  redirectCount = 0
-) {
+function performUpstreamRequest(remoteUrl, method, sendHeaders, bodyBuffer) {
   return new Promise((resolve, reject) => {
-    if (redirectCount > 6) {
-      reject(new Error("Too many upstream redirects"));
-      return;
-    }
-
     const isHttps = remoteUrl.protocol === "https:";
     const requestFn = isHttps ? https.request : http.request;
 
@@ -145,39 +134,6 @@ function performUpstreamRequest(
     });
 
     outgoing.on("response", (res) => {
-      const status = res.statusCode || 200;
-      const location = res.headers.location;
-
-      // Automatically follow redirects for GET/HEAD/303 so Service Workers never stall on 301/302
-      if (
-        [301, 302, 303, 307, 308].includes(status) &&
-        location &&
-        (method === "GET" || method === "HEAD" || status === 303)
-      ) {
-        res.resume();
-        try {
-          const nextUrl = new URL(location, remoteUrl);
-          const nextMethod = status === 303 ? "GET" : method;
-          const nextHeaders = {
-            ...sendHeaders,
-            Host: nextUrl.host,
-            Referer: remoteUrl.href,
-          };
-          performUpstreamRequest(
-            nextUrl,
-            nextMethod,
-            nextHeaders,
-            status === 303 ? null : bodyBuffer,
-            redirectCount + 1
-          )
-            .then(resolve)
-            .catch(reject);
-          return;
-        } catch {
-          // If Location URL is invalid, return as-is
-        }
-      }
-
       resolve({ res, finalUrl: remoteUrl });
     });
 
@@ -239,11 +195,13 @@ export default async function handler(req, res) {
       const lower = key.toLowerCase();
       if (FORBIDDEN_SEND_HEADERS.has(lower) || lower.startsWith(":")) continue;
       if (typeof value === "string" || Array.isArray(value)) {
-        // Rewrite Origin and Referer to target origin so sites don't reject requests
-        if (lower === "origin") {
-          sendHeaders[key] = remoteUrl.origin;
-        } else if (lower === "referer") {
-          sendHeaders[key] = remoteUrl.href;
+        const strVal = String(value);
+        // Only rewrite Origin/Referer if it leaked the proxy host; preserve Scramjet's spoofed Origin (e.g. https://www.xbox.com calling emerald.xboxservices.com)
+        if (
+          (lower === "origin" || lower === "referer") &&
+          (strVal.includes("localhost") || strVal.includes(".vercel.app") || strVal.includes("/~/sj/"))
+        ) {
+          sendHeaders[key] = lower === "origin" ? remoteUrl.origin : remoteUrl.href;
         } else {
           sendHeaders[key] = value;
         }

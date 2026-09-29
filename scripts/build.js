@@ -42,4 +42,10 @@ for (const { src, dest } of targets) {
   console.log(`Copied ${path.relative(rootDir, src)} -> ${path.relative(rootDir, dest)}`);
 }
 
+const utilsSrc = path.join(publicDir, "utils", "scramjet-utils.js");
+const utilsAlias = path.join(publicDir, "utils", "utils.js");
+if (fs.existsSync(utilsSrc)) {
+  fs.cpSync(utilsSrc, utilsAlias);
+}
+
 console.log("Build complete! Static Scramjet assets are ready in public/.");

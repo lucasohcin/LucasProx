@@ -752,7 +752,7 @@ class HardenedBareTransport {
     if (isAdblockedHost(remoteUrl.hostname)) {
       logNetworkEvent("BLOCKED", remoteUrl.href, "Shield");
       return {
-        body: null,
+        body: new ArrayBuffer(0),
         headers: [],
         status: 204,
         statusText: "No Content",
@@ -839,7 +839,7 @@ class HardenedBareTransport {
     const normalizedHeaders = this.normalizeResponseHeaders(parsedBareHeaders);
 
     return {
-      body: response.body,
+      body: response.body || new ArrayBuffer(0),
       headers: normalizedHeaders,
       status,
       statusText,
@@ -945,7 +945,7 @@ async function registerServiceWorker() {
           once: true,
         })
       ),
-      new Promise((resolve) => setTimeout(resolve, 1200)),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
     ]);
   }
 
@@ -980,6 +980,14 @@ async function ensureEngineReady() {
           wasmPath: "/scram/scramjet.wasm",
           injectPath: "/controller/controller.inject.js",
         },
+        scramjetConfig: {
+          flags: {
+            allowInvalidJs: true,
+            allowFailedIntercepts: true,
+            sourcemaps: false,
+            syncxhr: false,
+          },
+        },
       });
 
       await ctrl.wait();
@@ -1005,6 +1013,8 @@ function createPageLifecyclePlugin(onTitle, onReady, onError) {
   const { ManagedPlugin } = globalThis.$scramjetController;
 
   class PageLifecyclePlugin extends ManagedPlugin {
+    hasLoadedTopDocument = false;
+
     constructor() {
       super("lucasprox-lifecycle", []);
     }
@@ -1028,6 +1038,7 @@ function createPageLifecyclePlugin(onTitle, onReady, onError) {
 
       this.tap(frame.hooks.init.post, (ctx) => {
         if (!ctx.isTopLevel) return;
+        this.hasLoadedTopDocument = true;
         onReady();
 
         const doc = ctx.window.document;
@@ -1050,8 +1061,8 @@ function createPageLifecyclePlugin(onTitle, onReady, onError) {
 
       this.tap(frame.hooks.error.request, (ctx) => {
         if (
-          ctx.rawrequest?.destination === "document" ||
-          ctx.rawrequest?.destination === "iframe"
+          ctx.rawrequest?.destination === "document" &&
+          !this.hasLoadedTopDocument
         ) {
           onError(ctx.error);
         }
@@ -1432,15 +1443,17 @@ async function navigateTo(
     return;
   }
 
-  // If user explicitly chose Proxy 1 (Scramjet Wasm SW)
-  if (engineToUse === "scramjet") {
+  // In Auto mode or Proxy 1: use Scramjet Wasm Service Worker (full AST JS/HTML/Cookie/Worker virtualization)
+  // so complex anti-proxy sites like Xbox Cloud Gaming, Discord, YouTube, and Poki are 100% undetectable!
+  if (engineToUse === "auto" || engineToUse === "scramjet") {
     try {
       const sjFrame = await Promise.race([
         ensureTabScramjetFrame(targetTab),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("SW timeout")), 2500)
+          setTimeout(() => reject(new Error("SW timeout")), 6000)
         ),
       ]);
+      logNetworkEvent("GET", targetUrl, engineToUse);
       sjFrame.go(targetUrl);
       return;
     } catch {
@@ -1452,8 +1465,8 @@ async function navigateTo(
     }
   }
 
-  // In Auto mode (and Proxy 2 / Proxy 3 / Proxy 4 / Reader):
-  // Route immediately via server-rewritten proxy with escaped-asset recovery so pages never hang on white/grey screens!
+  // In Proxy 2 / Proxy 3 / Proxy 4 / Reader:
+  // Route via server-rewritten proxy with escaped-asset recovery
   resetTabIframeIfHooked(targetTab);
   const effectiveEngine = engineToUse === "auto" ? "uv" : engineToUse;
   const serverSrc = buildServerEngineIframeSrc(targetUrl, effectiveEngine);
