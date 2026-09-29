@@ -152,17 +152,337 @@ function updateFooterMetadata() {
 
 updateFooterMetadata();
 
+const BARE_MAX_HEADER_VALUE = 3072;
+const BARE_STRIP_RESPONSE_HEADERS = new Set([
+  "content-encoding",
+  "content-length",
+  "transfer-encoding",
+]);
+
+function toAsciiJson(obj) {
+  return JSON.stringify(obj).replace(
+    /[\u007f-\uffff]/g,
+    (ch) => "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0")
+  );
+}
+
+function splitBareHeaders(headers) {
+  const output = new Headers(headers);
+  if (headers.has("x-bare-headers")) {
+    const value = headers.get("x-bare-headers") || "";
+    if (value.length > BARE_MAX_HEADER_VALUE) {
+      output.delete("x-bare-headers");
+      let split = 0;
+      for (let i = 0; i < value.length; i += BARE_MAX_HEADER_VALUE) {
+        const part = value.slice(i, i + BARE_MAX_HEADER_VALUE);
+        output.set(`x-bare-headers-${split++}`, `;${part}`);
+      }
+    }
+  }
+  return output;
+}
+
+function joinBareHeaders(headers) {
+  const output = new Headers(headers);
+  const prefix = "x-bare-headers";
+  if (headers.has(`${prefix}-0`)) {
+    const join = [];
+    for (const [header, value] of headers) {
+      if (!header.toLowerCase().startsWith(prefix)) continue;
+      const rawVal = value.startsWith(";") ? value.slice(1) : value;
+      const id = parseInt(header.slice(prefix.length + 1), 10);
+      if (!Number.isNaN(id)) {
+        join[id] = rawVal;
+      }
+      output.delete(header);
+    }
+    output.set(prefix, join.join(""));
+  }
+  return output;
+}
+
+/**
+ * Hardened Bare V3 Transport tailored for Scramjet 2.0 + Netlify Serverless Functions.
+ * - Avoids calling response.json() on non-JSON error pages (which throws SyntaxError in WebKit)
+ * - Automatically falls back from /bare/v3/ to /.netlify/functions/bare/v3/ if needed
+ * - Flattens array headers (like set-cookie) into [string, string][] pairs expected by Scramjet 2.0
+ * - Strips content-encoding & content-length from inner headers since fetch() already decompresses
+ * - Validates all header names/values and statusText so new Headers() / new Response() never throws
+ */
+class HardenedBareTransport {
+  ready = true;
+
+  constructor(serverUrl) {
+    const primary = new URL("./v3/", serverUrl);
+    const fallback = new URL("/.netlify/functions/bare/v3/", location.origin);
+    this.endpoints = isLocalhost ? [primary.href] : [primary.href, fallback.href];
+    this.activeEndpointIndex = 0;
+
+    const wsUrl = new URL(primary.href);
+    wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:";
+    this.wsUrl = wsUrl.href;
+  }
+
+  async init() {
+    this.ready = true;
+  }
+
+  async meta() {}
+
+  createBareRequestHeaders(remote, rawHeaders) {
+    const headerMap = Object.create(null);
+    if (Array.isArray(rawHeaders)) {
+      for (const entry of rawHeaders) {
+        if (!Array.isArray(entry) || entry.length < 2) continue;
+        const key = String(entry[0]).trim();
+        const val = String(entry[1] ?? "");
+        const lower = key.toLowerCase();
+        if (
+          !key ||
+          lower.startsWith(":") ||
+          lower === "host" ||
+          lower === "connection" ||
+          lower === "content-length" ||
+          lower === "transfer-encoding"
+        ) {
+          continue;
+        }
+        headerMap[key] = val;
+      }
+    }
+    headerMap["Host"] = remote.host;
+
+    const headers = new Headers();
+    headers.set("x-bare-url", remote.toString());
+    headers.set("x-bare-headers", toAsciiJson(headerMap));
+    return splitBareHeaders(headers);
+  }
+
+  normalizeResponseHeaders(rawHeadersObj) {
+    const normalized = [];
+    const validator = new Headers();
+    if (!rawHeadersObj || typeof rawHeadersObj !== "object") {
+      return normalized;
+    }
+
+    const entries = Array.isArray(rawHeadersObj)
+      ? rawHeadersObj
+      : Object.entries(rawHeadersObj);
+
+    for (const [rawKey, rawVal] of entries) {
+      const key = String(rawKey || "").trim();
+      if (!key || key.startsWith(":")) continue;
+      const lower = key.toLowerCase();
+      if (BARE_STRIP_RESPONSE_HEADERS.has(lower)) continue;
+
+      const values = Array.isArray(rawVal) ? rawVal : [rawVal];
+      for (const item of values) {
+        if (item === undefined || item === null) continue;
+        const strVal = String(item).replace(/[\r\n\0]+/g, " ").trim();
+        try {
+          validator.append(key, strVal);
+          normalized.push([key, strVal]);
+        } catch {
+          // Skip invalid HTTP header name/value pairs that would throw SyntaxError in WebKit
+        }
+      }
+    }
+    return normalized;
+  }
+
+  async request(remote, method, body, headers, signal) {
+    const remoteUrl = remote instanceof URL ? remote : new URL(String(remote));
+    const upperMethod = String(method || "GET").toUpperCase();
+    const bareHeaders = this.createBareRequestHeaders(remoteUrl, headers);
+
+    const buildFetchOptions = () => {
+      const opts = {
+        credentials: "omit",
+        method: upperMethod,
+        headers: bareHeaders,
+        signal,
+      };
+      if (
+        body !== undefined &&
+        body !== null &&
+        upperMethod !== "GET" &&
+        upperMethod !== "HEAD"
+      ) {
+        opts.body = body;
+        opts.duplex = "half";
+      }
+      return opts;
+    };
+
+    const cacheParam = encodeURIComponent(remoteUrl.href).slice(0, 48);
+    let response = null;
+
+    for (let attempt = 0; attempt < this.endpoints.length; attempt++) {
+      const idx = (this.activeEndpointIndex + attempt) % this.endpoints.length;
+      const endpoint = this.endpoints[idx];
+      const reqUrl = `${endpoint}?cache=${cacheParam}`;
+
+      try {
+        const candidate = await fetch(reqUrl, buildFetchOptions());
+        const hasBareHeader =
+          candidate.headers.has("x-bare-status") ||
+          candidate.headers.has("x-bare-headers") ||
+          candidate.headers.has("x-bare-headers-0");
+
+        if (hasBareHeader) {
+          this.activeEndpointIndex = idx;
+          response = candidate;
+          break;
+        }
+
+        // If primary endpoint returned 404 or static HTML without x-bare-status, try fallback
+        if (attempt < this.endpoints.length - 1) {
+          continue;
+        }
+        response = candidate;
+      } catch (fetchErr) {
+        if (attempt < this.endpoints.length - 1) {
+          continue;
+        }
+        throw fetchErr;
+      }
+    }
+
+    const joined = joinBareHeaders(response.headers);
+    const xBareStatus = joined.get("x-bare-status");
+
+    if (!response.ok && xBareStatus === null) {
+      const errText = await response.text().catch(() => "");
+      let errMsg = `Bare server responded with HTTP ${response.status}`;
+      try {
+        const parsed = JSON.parse(errText);
+        if (parsed?.message) errMsg = parsed.message;
+      } catch {
+        if (errText && !errText.trim().startsWith("<")) {
+          errMsg = errText.slice(0, 160);
+        }
+      }
+      throw new Error(errMsg);
+    }
+
+    const status = xBareStatus ? parseInt(xBareStatus, 10) || 200 : response.status || 200;
+    const rawStatusText = joined.get("x-bare-status-text") || response.statusText || "OK";
+    const statusText =
+      String(rawStatusText).replace(/[^\t\x20-\x7e]/g, "").trim() || "OK";
+
+    let parsedBareHeaders = {};
+    const xBareHeaders = joined.get("x-bare-headers");
+    if (xBareHeaders) {
+      try {
+        parsedBareHeaders = JSON.parse(xBareHeaders);
+      } catch {
+        parsedBareHeaders = {};
+      }
+    }
+
+    const normalizedHeaders = this.normalizeResponseHeaders(parsedBareHeaders);
+
+    return {
+      body: response.body,
+      headers: normalizedHeaders,
+      status,
+      statusText,
+    };
+  }
+
+  connect(url, protocols, requestHeaders = [], onopen, onmessage, onclose, onerror) {
+    try {
+      const ws = new WebSocket(this.wsUrl);
+      const headerMap = Object.create(null);
+      if (Array.isArray(requestHeaders)) {
+        for (const [k, v] of requestHeaders) {
+          if (k) headerMap[String(k)] = String(v ?? "");
+        }
+      }
+      headerMap["Host"] = url.host;
+      headerMap["Upgrade"] = "websocket";
+      headerMap["Connection"] = "Upgrade";
+
+      const cleanup = () => {
+        ws.removeEventListener("close", closeListener);
+        ws.removeEventListener("message", messageListener);
+      };
+
+      const messageListener = (event) => {
+        cleanup();
+        try {
+          if (typeof event.data !== "string") {
+            onerror?.(new TypeError("Invalid Bare WebSocket handshake frame"));
+            ws.close();
+            return;
+          }
+          const message = JSON.parse(event.data);
+          if (message.type !== "open") {
+            onerror?.(new Error("Bare WebSocket did not open"));
+            ws.close();
+            return;
+          }
+          onopen?.(message.protocol || "", "");
+          ws.addEventListener("message", (ev) => onmessage?.(ev.data));
+          ws.addEventListener("close", (ev) => onclose?.(ev.code, ev.reason));
+        } catch (err) {
+          onerror?.(err);
+          ws.close();
+        }
+      };
+
+      const closeListener = (event) => {
+        onclose?.(event.code, event.reason);
+        cleanup();
+      };
+
+      ws.addEventListener("message", messageListener);
+      ws.addEventListener("close", closeListener);
+      ws.addEventListener("error", (err) => onerror?.(err));
+      ws.addEventListener(
+        "open",
+        () => {
+          ws.send(
+            JSON.stringify({
+              type: "connect",
+              remote: url.toString(),
+              protocols: protocols || [],
+              headers: headerMap,
+              forwardHeaders: [],
+            })
+          );
+        },
+        { once: true }
+      );
+
+      return [
+        (data) => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(data);
+        },
+        (code, reason) => {
+          try {
+            ws.close(code, reason);
+          } catch {}
+        },
+      ];
+    } catch (err) {
+      queueMicrotask(() => onerror?.(err));
+      return [() => {}, () => {}];
+    }
+  }
+}
+
 /**
  * Build and initialize the selected transport (Bare V3, Epoxy, or Libcurl)
  */
 async function createTransport(kind) {
-  const modulePath = TRANSPORT_PATHS[kind] || TRANSPORT_PATHS.bare;
+  if (kind === "bare" || !TRANSPORT_PATHS[kind]) {
+    return new HardenedBareTransport(getBareUrl());
+  }
+  const modulePath = TRANSPORT_PATHS[kind];
   const mod = await import(modulePath);
   const TransportClass = mod.default;
-  const transport =
-    kind === "bare"
-      ? new TransportClass(getBareUrl())
-      : new TransportClass({ wisp: getWispUrl() });
+  const transport = new TransportClass({ wisp: getWispUrl() });
   if (!transport.ready && typeof transport.init === "function") {
     await transport.init();
   }
@@ -259,7 +579,7 @@ async function ensureEngineReady() {
 }
 
 /**
- * Create a custom plugin that watches proxied document <title> and load state
+ * Create a custom plugin that watches proxied document <title>, load state, and sanitizes response headers
  */
 function createPageLifecyclePlugin(onTitle, onReady, onError) {
   const { ManagedPlugin } = globalThis.$scramjetController;
@@ -271,6 +591,19 @@ function createPageLifecyclePlugin(onTitle, onReady, onError) {
 
     install(frame) {
       super.install(frame);
+
+      this.tap(frame.hooks.fetch.response, (_ctx, state) => {
+        if (!state?.response) return;
+        const res = state.response;
+        res.statusText =
+          String(res.statusText || "OK").replace(/[^\t\x20-\x7e]/g, "").trim() ||
+          "OK";
+        if (res.headers && typeof res.headers.delete === "function") {
+          res.headers.delete("content-encoding");
+          res.headers.delete("content-length");
+          res.headers.delete("transfer-encoding");
+        }
+      });
 
       this.tap(frame.hooks.init.post, (ctx) => {
         if (!ctx.isTopLevel) return;
@@ -294,7 +627,7 @@ function createPageLifecyclePlugin(onTitle, onReady, onError) {
       });
 
       this.tap(frame.hooks.error.request, (ctx) => {
-        if (ctx.rawrequest?.destination === "document") {
+        if (ctx.rawrequest?.destination === "document" || ctx.rawrequest?.destination === "iframe") {
           onError(ctx.error);
         }
       });

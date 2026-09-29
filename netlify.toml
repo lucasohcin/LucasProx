@@ -5,11 +5,16 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["@tomphttp/bare-server-node"]
 
 [[redirects]]
   from = "/bare/*"
   to = "/.netlify/functions/bare/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/bare"
+  to = "/.netlify/functions/bare"
   status = 200
   force = true
 

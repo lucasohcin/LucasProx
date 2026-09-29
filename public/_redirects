@@ -1,0 +1,2 @@
+/bare/*  /.netlify/functions/bare/:splat  200!
+/bare    /.netlify/functions/bare         200!
