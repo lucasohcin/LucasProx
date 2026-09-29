@@ -11,6 +11,12 @@ const publicDir = path.join(__dirname, "public");
 
 const app = express();
 
+// Ensure cross-origin HTML5 & 3D WebGL game iframes and thumbnails embed without COEP restrictions
+app.use((_req, res, next) => {
+  res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
+  next();
+});
+
 // Route tunnel requests
 app.all(["/bare", "/bare/*", "/api/bare", "/api/bare/*"], (req, res) => {
   void vercelBareHandler(req, res);

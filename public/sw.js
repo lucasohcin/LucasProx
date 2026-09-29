@@ -66,12 +66,25 @@ self.Response = SafeSwResponse;
 importScripts("/uv/uv.config.js");
 importScripts("/controller/controller.sw.js");
 
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  // Let Ultraviolet (/service/uv/*) and server proxy (/api/proxy) requests pass directly to the backend handler
+  // Never intercept cross-origin requests (e.g. direct HTML5/WebGL game CDNs or thumbnails)
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+  // Never intercept backend APIs, server proxy routes, or bare endpoints
   if (
-    url.origin === self.location.origin &&
-    (url.pathname.startsWith("/service/uv/") || url.pathname.startsWith("/api/proxy"))
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/service/") ||
+    url.pathname.startsWith("/bare")
   ) {
     return;
   }

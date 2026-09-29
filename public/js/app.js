@@ -14,8 +14,8 @@ const STORAGE_KEYS = {
   customFavicon: "lucasprox:custom-favicon",
   panicUrl: "lucasprox:panic-url",
   adblock: "lucasprox:adblock",
-  bookmarks: "lucasprox:bookmarks",
-  shortcuts: "lucasprox:shortcuts",
+  bookmarks: "lucasprox:bookmarks:v2",
+  shortcuts: "lucasprox:shortcuts:v2",
   history: "lucasprox:history",
   notes: "lucasprox:notes",
 };
@@ -98,131 +98,144 @@ const ADBLOCK_HOST_PATTERNS = [
 
 const DEFAULT_SHORTCUTS = [
   { title: "Games Hub", url: "lucasprox://games", icon: "🎮" },
+  { title: "Red Dead 3D", url: "https://html5.gamemonetize.co/a44bnhgsoo8ge4lr9s85lt83p7cz2h8d/", icon: "🤠" },
+  { title: "GTA NY 3D", url: "https://html5.gamemonetize.co/zt4qt847w9o5z06a4ayj5kwy2p9eyifi/", icon: "🚓" },
+  { title: "Slope 3D", url: "https://html5.gamemonetize.co/2tscjd5hjy09sm7owo0saawmk6lbo3i3/", icon: "🟢" },
   { title: "DuckDuckGo", url: "https://duckduckgo.com", icon: "D" },
   { title: "Wikipedia", url: "https://www.wikipedia.org", icon: "W" },
   { title: "Reddit", url: "https://old.reddit.com", icon: "R" },
-  { title: "Hacker News", url: "https://news.ycombinator.com", icon: "Y" },
-  { title: "Xbox Cloud", url: "https://www.xbox.com/play", icon: "X" },
-  { title: "GeForce NOW", url: "https://play.geforcenow.com", icon: "N" },
 ];
 
 const DEFAULT_BOOKMARKS = [
-  { title: "🎮 Games (1,100+)", url: "lucasprox://games" },
-  { title: "Red Dead Redemption 2", url: "https://cloud.boosteroid.com/application/849" },
-  { title: "Fortnite Cloud", url: "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2" },
+  { title: "🎮 Games Hub (1,430+)", url: "lucasprox://games" },
+  { title: "🤠 Red Dead 3D", url: "https://html5.gamemonetize.co/a44bnhgsoo8ge4lr9s85lt83p7cz2h8d/" },
+  { title: "🚓 GTA New York 3D", url: "https://html5.gamemonetize.co/zt4qt847w9o5z06a4ayj5kwy2p9eyifi/" },
+  { title: "🔫 Call of Ops 3", url: "https://html5.gamemonetize.co/n3hf4ijzvtj1dycfglrh4d1ydp5wet5k/" },
+  { title: "⛏ Minecraft 3D", url: "https://html5.gamemonetize.co/cznxajp3hzb8l7gtebaq96s0pbrfa33m/" },
+  { title: "🟢 Slope 3D", url: "https://html5.gamemonetize.co/2tscjd5hjy09sm7owo0saawmk6lbo3i3/" },
   { title: "DuckDuckGo", url: "https://duckduckgo.com" },
-  { title: "Wikipedia", url: "https://www.wikipedia.org" },
-  { title: "Reddit", url: "https://old.reddit.com" },
 ];
 
-// Instant-load starter games while /api/games loads the full 1,100+ catalog
+// Instant-load verified free games while /api/games loads the full 1,430+ catalog
 const STARTER_GAMES = [
   {
-    id: "aaa-rdr2",
-    title: "Red Dead Redemption 2",
+    id: "gm-a44bnhgsoo8ge4lr9s85lt83p7cz2h8d",
+    title: "Red Dead: Wild West Clash 3D",
     category: "aaa",
-    badge: "AAA Cloud",
-    studio: "Rockstar Games • Cloud Stream",
-    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1174180/header.jpg",
-    url: "https://cloud.boosteroid.com/application/849",
+    badge: "3D Western",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/a44bnhgsoo8ge4lr9s85lt83p7cz2h8d/512x384.jpg",
+    url: "https://html5.gamemonetize.co/a44bnhgsoo8ge4lr9s85lt83p7cz2h8d/",
+    directEmbed: true,
   },
   {
-    id: "aaa-rdr1",
-    title: "Red Dead Redemption",
+    id: "gm-8lkfexr7sk4l1o4ej8nc9iviciv1a0pj",
+    title: "Red Dead: Gunslinger Western Duel",
     category: "aaa",
-    badge: "AAA Cloud",
-    studio: "Rockstar Games • Xbox Cloud",
-    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2668510/header.jpg",
-    url: "https://www.xbox.com/en-US/play/games/red-dead-redemption/BWKLPNS6717R",
+    badge: "Western Duel",
+    studio: "Free Instant Play",
+    thumb: "https://img.gamemonetize.com/8lkfexr7sk4l1o4ej8nc9iviciv1a0pj/512x384.jpg",
+    url: "https://html5.gamemonetize.co/8lkfexr7sk4l1o4ej8nc9iviciv1a0pj/",
+    directEmbed: true,
   },
   {
-    id: "aaa-gtav",
-    title: "Grand Theft Auto V (GTA 5)",
+    id: "gm-zt4qt847w9o5z06a4ayj5kwy2p9eyifi",
+    title: "Grand Theft Auto: New York 3D",
     category: "aaa",
-    badge: "AAA Cloud",
-    studio: "Rockstar Games • Xbox Cloud",
-    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/271590/header.jpg",
-    url: "https://www.xbox.com/en-US/play/games/grand-theft-auto-v/BPJ686W6S0NH",
+    badge: "3D Open World",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/zt4qt847w9o5z06a4ayj5kwy2p9eyifi/512x384.jpg",
+    url: "https://html5.gamemonetize.co/zt4qt847w9o5z06a4ayj5kwy2p9eyifi/",
+    directEmbed: true,
   },
   {
-    id: "aaa-fortnite",
-    title: "Fortnite (Free Cloud Play)",
+    id: "gm-ywgsu1e8jqboj8d4tbnomnm111ro0vpy",
+    title: "GTA Crime Simulator 3D",
     category: "aaa",
-    badge: "Free Cloud",
-    studio: "Epic Games • Xbox Cloud",
-    thumb: "https://cdn2.unrealengine.com/social-image-chapter4-s3-3840x2160-d35912cc25ad.jpg",
-    url: "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2",
+    badge: "3D Open World",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/ywgsu1e8jqboj8d4tbnomnm111ro0vpy/512x384.jpg",
+    url: "https://html5.gamemonetize.co/ywgsu1e8jqboj8d4tbnomnm111ro0vpy/",
+    directEmbed: true,
   },
   {
-    id: "aaa-cyberpunk",
-    title: "Cyberpunk 2077",
+    id: "gm-n3hf4ijzvtj1dycfglrh4d1ydp5wet5k",
+    title: "Call of Ops 3: Modern Warfare 3D",
     category: "aaa",
-    badge: "AAA Cloud",
-    studio: "CD Projekt Red • GeForce NOW",
-    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1091500/header.jpg",
-    url: "https://play.geforcenow.com",
+    badge: "3D Tactical FPS",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/n3hf4ijzvtj1dycfglrh4d1ydp5wet5k/512x384.jpg",
+    url: "https://html5.gamemonetize.co/n3hf4ijzvtj1dycfglrh4d1ydp5wet5k/",
+    directEmbed: true,
   },
   {
-    id: "aaa-cod",
-    title: "Call of Duty: Warzone & BO6",
+    id: "gm-6rm2gmqb5vs4zm6akpzjiwf4cuxkqsyw",
+    title: "Counter-Strike: Survival 3D",
     category: "aaa",
-    badge: "AAA Cloud",
-    studio: "Activision • Xbox Cloud",
-    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1938090/header.jpg",
-    url: "https://www.xbox.com/en-US/play/games/call-of-duty-black-ops-6/9PF528M6CRHQ",
+    badge: "3D Tactical FPS",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/6rm2gmqb5vs4zm6akpzjiwf4cuxkqsyw/512x384.jpg",
+    url: "https://html5.gamemonetize.co/6rm2gmqb5vs4zm6akpzjiwf4cuxkqsyw/",
+    directEmbed: true,
   },
   {
-    id: "aaa-eldenring",
-    title: "Elden Ring",
+    id: "gm-hwx6v25biq7www5qh9jxe7vjda61r1fg",
+    title: "Fort Clash Survival: Battle Royale 3D",
     category: "aaa",
-    badge: "AAA Cloud",
-    studio: "FromSoftware • Boosteroid",
-    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1245620/header.jpg",
-    url: "https://cloud.boosteroid.com/application/1164",
+    badge: "3D Battle Royale",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/hwx6v25biq7www5qh9jxe7vjda61r1fg/512x384.jpg",
+    url: "https://html5.gamemonetize.co/hwx6v25biq7www5qh9jxe7vjda61r1fg/",
+    directEmbed: true,
   },
   {
-    id: "aaa-forza5",
-    title: "Forza Horizon 5",
+    id: "gm-df7z81myzi5v27zgqrvayg8rmxv7tork",
+    title: "Cyberpunk 2077: Drift City 3D",
     category: "aaa",
-    badge: "AAA Cloud",
-    studio: "Xbox Cloud Gaming",
-    thumb: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1551360/header.jpg",
-    url: "https://www.xbox.com/en-US/play/games/forza-horizon-5/9NKX70BBCDRN",
+    badge: "3D Cyber Racing",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/df7z81myzi5v27zgqrvayg8rmxv7tork/512x384.jpg",
+    url: "https://html5.gamemonetize.co/df7z81myzi5v27zgqrvayg8rmxv7tork/",
+    directEmbed: true,
   },
   {
-    id: "pop-slope",
-    title: "Slope 3D",
+    id: "gm-t34z5o1hxwvn0fzanw148uxis4ix8b7p",
+    title: "DOOM: Iron Breach 3D FPS",
+    category: "aaa",
+    badge: "3D Arena FPS",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/t34z5o1hxwvn0fzanw148uxis4ix8b7p/512x384.jpg",
+    url: "https://html5.gamemonetize.co/t34z5o1hxwvn0fzanw148uxis4ix8b7p/",
+    directEmbed: true,
+  },
+  {
+    id: "gm-cznxajp3hzb8l7gtebaq96s0pbrfa33m",
+    title: "Minecraft Remake 3D",
+    category: "aaa",
+    badge: "3D Voxel Sandbox",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/cznxajp3hzb8l7gtebaq96s0pbrfa33m/512x384.jpg",
+    url: "https://html5.gamemonetize.co/cznxajp3hzb8l7gtebaq96s0pbrfa33m/",
+    directEmbed: true,
+  },
+  {
+    id: "gm-xvrvr5zo8wbhensz0a8de13xn23lfjmc",
+    title: "Forza Street Highway 3D",
+    category: "aaa",
+    badge: "3D Street Racing",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/xvrvr5zo8wbhensz0a8de13xn23lfjmc/512x384.jpg",
+    url: "https://html5.gamemonetize.co/xvrvr5zo8wbhensz0a8de13xn23lfjmc/",
+    directEmbed: true,
+  },
+  {
+    id: "gm-2tscjd5hjy09sm7owo0saawmk6lbo3i3",
+    title: "Slope 3D Original",
     category: "arcade",
-    badge: "HTML5",
-    studio: "WebGL Arcade",
-    url: "https://slope-game.github.io/",
-    directEmbed: true,
-  },
-  {
-    id: "pop-retrobowl",
-    title: "Retro Bowl",
-    category: "sports",
-    badge: "HTML5",
-    studio: "Sports Classic",
-    url: "https://retro-bowl.github.io/",
-    directEmbed: true,
-  },
-  {
-    id: "pop-2048",
-    title: "2048 Original",
-    category: "puzzle",
-    badge: "HTML5",
-    studio: "Puzzle Classic",
-    url: "https://play2048.co/",
-    directEmbed: true,
-  },
-  {
-    id: "pop-minecraft",
-    title: "Minecraft Classic",
-    category: "aaa",
-    badge: "WebGL",
-    studio: "Mojang Official Web",
-    url: "https://classic.minecraft.net/",
+    badge: "Popular 3D",
+    studio: "Free 3D WebGL • Instant Play",
+    thumb: "https://img.gamemonetize.com/2tscjd5hjy09sm7owo0saawmk6lbo3i3/512x384.jpg",
+    url: "https://html5.gamemonetize.co/2tscjd5hjy09sm7owo0saawmk6lbo3i3/",
     directEmbed: true,
   },
 ];
@@ -1301,11 +1314,10 @@ async function ensureTabScramjetFrame(tab) {
  */
 const DIRECT_EMBED_DOMAINS = [
   "html5.gamemonetize.co",
+  "gamemonetize.co",
   "html5.gamedistribution.com",
   "classic.minecraft.net",
   "play2048.co",
-  "slope-game.github.io",
-  "retro-bowl.github.io",
   "chromedino.com",
   "flappybird.io",
   "freepacman.org",
@@ -1321,10 +1333,38 @@ function shouldDirectEmbedInAuto(urlStr) {
   }
 }
 
+function resetTabIframeIfHooked(tab) {
+  if (!tab.sjFrame) return;
+  if (scramjetController) {
+    const fIdx = scramjetController.frames.indexOf(tab.sjFrame);
+    if (fIdx !== -1) scramjetController.frames.splice(fIdx, 1);
+  }
+  tab.sjFrame = null;
+
+  const freshIframe = document.createElement("iframe");
+  freshIframe.className = tab.iframe.className;
+  freshIframe.setAttribute("title", tab.iframe.getAttribute("title") || "Tab");
+  freshIframe.setAttribute(
+    "allow",
+    "autoplay; fullscreen; gamepad; pointer-lock; clipboard-read; clipboard-write"
+  );
+  freshIframe.addEventListener("load", () => {
+    if (tab.loading) {
+      tab.loading = false;
+      renderUI();
+    }
+  });
+  tab.iframe.replaceWith(freshIframe);
+  tab.iframe = freshIframe;
+}
+
 /**
  * Navigate Tab (Guaranteed Load across all websites & games)
  */
-async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngine = null } = {}) {
+async function navigateTo(
+  rawInput,
+  { pushHistory = true, tab = null, forceEngine = null, customTitle = null } = {}
+) {
   const targetUrl = resolveInput(rawInput);
   if (!targetUrl) return;
 
@@ -1338,12 +1378,19 @@ async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngin
     targetTab = createTab({ select: true });
   }
 
-  const engineToUse = forceEngine || currentEngine || "auto";
-  targetTab.engine = engineToUse;
+  const matchedGame = allGamesCatalog.find((g) => g.url === targetUrl);
+  const resolvedTitle =
+    customTitle || matchedGame?.title || formatHostnameOrTitle(targetUrl);
+
+  const engineToUse =
+    forceEngine || (matchedGame?.directEmbed ? "embed" : currentEngine || "auto");
+  if (!forceEngine && engineToUse !== "embed") {
+    targetTab.engine = engineToUse;
+  }
   targetTab.showLaunchpad = false;
   targetTab.loading = true;
   targetTab.url = targetUrl;
-  targetTab.title = formatHostnameOrTitle(targetUrl);
+  targetTab.title = resolvedTitle;
 
   if (pushHistory) {
     recordTabUrl(targetTab, targetUrl);
@@ -1357,13 +1404,31 @@ async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngin
   heroInput.blur();
   renderUI();
 
-  // Direct high-FPS embed for HTML5 game CDNs when in Auto or Direct mode
+  // Safety timer so loading bar never hangs on long-polling game/site streams
+  setTimeout(() => {
+    if (targetTab.loading && targetTab.url === targetUrl) {
+      targetTab.loading = false;
+      renderUI();
+    }
+  }, 2500);
+
+  // Direct high-FPS embed for HTML5 & 3D WebGL game CDNs when in Auto or Direct mode
   if (
     engineToUse === "embed" ||
     (engineToUse === "auto" && shouldDirectEmbedInAuto(targetUrl))
   ) {
+    resetTabIframeIfHooked(targetTab);
     logNetworkEvent("GET", targetUrl, "embed");
     targetTab.iframe.src = targetUrl;
+    targetTab.iframe.addEventListener(
+      "load",
+      () => {
+        try {
+          targetTab.iframe.focus();
+        } catch {}
+      },
+      { once: true }
+    );
     return;
   }
 
@@ -1379,6 +1444,7 @@ async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngin
       sjFrame.go(targetUrl);
       return;
     } catch {
+      resetTabIframeIfHooked(targetTab);
       const fallbackSrc = buildServerEngineIframeSrc(targetUrl, "uv");
       logNetworkEvent("GET", targetUrl, "uv");
       targetTab.iframe.src = fallbackSrc;
@@ -1388,6 +1454,7 @@ async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngin
 
   // In Auto mode (and Proxy 2 / Proxy 3 / Proxy 4 / Reader):
   // Route immediately via server-rewritten proxy with escaped-asset recovery so pages never hang on white/grey screens!
+  resetTabIframeIfHooked(targetTab);
   const effectiveEngine = engineToUse === "auto" ? "uv" : engineToUse;
   const serverSrc = buildServerEngineIframeSrc(targetUrl, effectiveEngine);
   logNetworkEvent("GET", targetUrl, engineToUse);
@@ -1513,7 +1580,9 @@ function renderBookmarks() {
     });
 
     btn.append(label, del);
-    btn.addEventListener("click", () => void navigateTo(bm.url));
+    btn.addEventListener("click", () =>
+      void navigateTo(bm.url, { customTitle: bm.title.replace(/^[^\w]+/, "").trim() })
+    );
     return btn;
   });
   bookmarksListEl.replaceChildren(...nodes);
@@ -1546,7 +1615,9 @@ function renderShortcuts() {
     });
 
     card.append(icon, title, delBtn);
-    card.addEventListener("click", () => void navigateTo(item.url));
+    card.addEventListener("click", () =>
+      void navigateTo(item.url, { customTitle: item.title })
+    );
     return card;
   });
 
@@ -1577,7 +1648,7 @@ function promptAddShortcut() {
 }
 
 /**
- * Games Hub (1,100+ HTML5 Games & AAA Cloud Gaming)
+ * Games Hub (1,430+ Free Instant-Play 3D WebGL & HTML5 Games)
  */
 async function ensureGamesLoaded() {
   if (gamesLoadedFromApi) return;
@@ -1588,7 +1659,7 @@ async function ensureGamesLoaded() {
     if (Array.isArray(data.games) && data.games.length > 0) {
       allGamesCatalog = data.games;
       gamesLoadedFromApi = true;
-      gamesTotalBadge.textContent = `${data.games.length.toLocaleString()}+ Games`;
+      gamesTotalBadge.textContent = `${data.games.length.toLocaleString()} Free Games`;
       if (!gamesModal.hidden) {
         renderGamesGrid();
       }
@@ -1598,7 +1669,7 @@ async function ensureGamesLoaded() {
 
 function openGamesHub() {
   gamesModal.hidden = false;
-  currentGamesRenderLimit = 48;
+  currentGamesRenderLimit = 60;
   renderGamesGrid();
   gamesSearchInput.focus();
   void ensureGamesLoaded();
@@ -1647,15 +1718,15 @@ function renderGamesGrid() {
       <div class="game-card__body">
         <div class="game-card__title">${escapeHtml(game.title)}</div>
         <div class="game-card__sub">${escapeHtml(
-          game.studio || "Instant Play"
+          game.studio || "Free Instant Play"
         )}</div>
       </div>
     `;
 
     btn.addEventListener("click", () => {
       gamesModal.hidden = true;
-      const forceEngine = game.directEmbed ? "embed" : null;
-      void navigateTo(game.url, { forceEngine });
+      const forceEngine = game.directEmbed !== false ? "embed" : null;
+      void navigateTo(game.url, { forceEngine, customTitle: game.title });
     });
 
     return btn;
