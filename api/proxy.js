@@ -786,8 +786,8 @@ export default async function proxyHandler(req, res) {
 </head>
 <body>
   <div class="card">
-    <h2>Upstream Target Unreachable</h2>
-    <p>The selected proxy engine could not reach this host. Try switching proxy engines in the top bar (Scramjet 2.0, Ultraviolet, AeroStream, DirectEdge, or ReaderLite).</p>
+    <h2>Site Temporarily Unavailable</h2>
+    <p>This site didn't respond on the current proxy route. Click <strong>Switch Proxy</strong> in the top bar to try another route.</p>
     <code>${String(err?.message || err).replace(/[<>&]/g, "")}</code>
   </div>
 </body>

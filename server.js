@@ -10,7 +10,7 @@ const publicDir = path.join(__dirname, "public");
 
 const app = express();
 
-// Cross-origin isolation headers for Scramjet & Wasm transports
+// Cross-origin isolation headers
 app.use((_req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
   res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
@@ -18,37 +18,27 @@ app.use((_req, res, next) => {
   next();
 });
 
-// Route Bare V3 proxy requests (/bare, /bare/*, /api/bare, /api/bare/*)
+// Route tunnel requests
 app.all(["/bare", "/bare/*", "/api/bare", "/api/bare/*"], (req, res) => {
   void vercelBareHandler(req, res);
 });
 
-// Route Multi-Proxy Engine requests (Ultraviolet /service/uv/*, AeroStream, DirectEdge, ReaderLite)
+// Route multi-proxy requests
 app.all(["/api/proxy", "/api/proxy/*", "/service/uv/*"], (req, res) => {
   void proxyHandler(req, res);
 });
 
-// Health, latency ping & proxy metadata endpoint
+// Health & latency ping endpoint
 app.get("/api/status", (_req, res) => {
   res.json({
-    name: "LucasProx 10X",
-    engines: [
-      { id: "scramjet", name: "Scramjet 2.0 (Wasm SW)" },
-      { id: "uv", name: "Ultraviolet (UV XOR)" },
-      { id: "aero", name: "AeroStream (Session Rewriter)" },
-      { id: "direct", name: "DirectEdge (Fast Stream)" },
-      { id: "reader", name: "ReaderLite (Text Mode)" },
-      { id: "auto", name: "Auto-Switch (Smart Failover)" },
-    ],
-    wisp: "/wisp/",
-    bare: "/api/bare",
-    transports: ["bare", "epoxy", "libcurl"],
+    name: "LucasProx",
+    routes: ["auto", "route1", "route2", "route3", "route4"],
     timestamp: Date.now(),
     status: "online",
   });
 });
 
-// Serve static files from public/ (includes /scram, /controller, /utils, /baremod, /uv, etc.)
+// Serve static files from public/
 app.use(express.static(publicDir));
 
 // SPA fallback to index.html
@@ -83,7 +73,7 @@ if (!process.env.VERCEL) {
     .catch(() => {});
 
   server.listen(PORT, () => {
-    console.log(`\n  ⚡ LucasProx 10X (Multi-Proxy: Scramjet 2.0 + Ultraviolet + AeroStream + DirectEdge) is running!`);
+    console.log(`\n  ⚡ LucasProx is running!`);
     console.log(`  ➜ Local:   http://localhost:${PORT}\n`);
   });
 }

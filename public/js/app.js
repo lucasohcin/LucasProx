@@ -1,6 +1,5 @@
 const STORAGE_KEYS = {
   engine: "lucasprox:engine",
-  transport: "lucasprox:transport",
   searchEngine: "lucasprox:search-engine",
   theme: "lucasprox:theme",
   accentColor: "lucasprox:accent-color",
@@ -15,44 +14,27 @@ const STORAGE_KEYS = {
   customFavicon: "lucasprox:custom-favicon",
   panicUrl: "lucasprox:panic-url",
   adblock: "lucasprox:adblock",
-  userAgent: "lucasprox:user-agent",
   bookmarks: "lucasprox:bookmarks",
   shortcuts: "lucasprox:shortcuts",
   history: "lucasprox:history",
   notes: "lucasprox:notes",
 };
 
-const TRANSPORT_PATHS = {
-  bare: "/baremod/index.mjs",
-  epoxy: "/epoxy/index.mjs",
-  libcurl: "/libcurl/index.mjs",
-};
+// Generic, unbranded proxy route names
+const PROXY_CYCLE_ORDER = ["auto", "scramjet", "uv", "aero", "direct"];
 
-const ENGINE_LABELS = {
-  scramjet: "Scramjet 2.0",
-  uv: "Ultraviolet",
-  aero: "AeroStream",
-  direct: "DirectEdge",
-  reader: "ReaderLite",
-  auto: "Auto-Switch",
-};
-
-const USER_AGENT_STRINGS = {
-  default: navigator.userAgent,
-  chrome:
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  safari:
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
-  iphone:
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
-  android:
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
-  bot: "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+const ROUTE_LABELS = {
+  auto: "Auto",
+  scramjet: "Proxy 1",
+  uv: "Proxy 2",
+  aero: "Proxy 3",
+  direct: "Proxy 4",
+  reader: "Reader",
 };
 
 const CLOAK_PRESETS = {
   default: {
-    title: "LucasProx — 10X Multi-Engine Stealth Web Proxy",
+    title: "LucasProx",
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%237c5cff'/><path d='M30 70L50 26L70 70H57L50 53L43 70H30Z' fill='white'/></svg>",
   },
   docs: {
@@ -116,19 +98,17 @@ const ADBLOCK_HOST_PATTERNS = [
 const DEFAULT_SHORTCUTS = [
   { title: "DuckDuckGo", url: "https://duckduckgo.com", icon: "D" },
   { title: "Wikipedia", url: "https://www.wikipedia.org", icon: "W" },
-  { title: "Hacker News", url: "https://news.ycombinator.com", icon: "Y" },
   { title: "Reddit", url: "https://old.reddit.com", icon: "R" },
+  { title: "Hacker News", url: "https://news.ycombinator.com", icon: "Y" },
   { title: "GitHub", url: "https://github.com", icon: "G" },
-  { title: "Brave Search", url: "https://search.brave.com", icon: "B" },
-  { title: "Archive.org", url: "https://archive.org", icon: "A" },
-  { title: "Example.com", url: "https://example.com", icon: "E" },
+  { title: "Archive", url: "https://archive.org", icon: "A" },
 ];
 
 const DEFAULT_BOOKMARKS = [
   { title: "DuckDuckGo", url: "https://duckduckgo.com" },
   { title: "Wikipedia", url: "https://www.wikipedia.org" },
   { title: "Hacker News", url: "https://news.ycombinator.com" },
-  { title: "Old Reddit", url: "https://old.reddit.com" },
+  { title: "Reddit", url: "https://old.reddit.com" },
   { title: "Archive.org", url: "https://archive.org" },
 ];
 
@@ -142,13 +122,6 @@ const framesStageEl = document.getElementById("frames-stage");
 const launchpadEl = document.getElementById("launchpad");
 const loadingBarEl = document.getElementById("loading-bar");
 
-const statusPillEl = document.getElementById("status-pill");
-const statusTextEl = document.getElementById("status-text");
-const footerEngineEl = document.getElementById("footer-engine");
-const footerTransportEl = document.getElementById("footer-transport");
-const footerIsolationEl = document.getElementById("footer-isolation");
-const footerShieldEl = document.getElementById("footer-shield");
-
 const pingTextEl = document.getElementById("ping-text");
 const btnPanic = document.getElementById("btn-panic");
 
@@ -160,45 +133,41 @@ const btnReaderToggle = document.getElementById("btn-reader-toggle");
 
 const heroForm = document.getElementById("hero-form");
 const heroInput = document.getElementById("hero-input");
-const selectEngineEl = document.getElementById("select-engine");
-const launchpadEnginePills = document.getElementById("launchpad-engine-pills");
 const quickGridEl = document.getElementById("quick-grid");
-const btnAddShortcut = document.getElementById("btn-add-shortcut");
 
 const btnBrand = document.getElementById("btn-brand");
 const btnNewTab = document.getElementById("btn-new-tab");
-const btnDuplicateTab = document.getElementById("btn-duplicate-tab");
-const btnPinTab = document.getElementById("btn-pin-tab");
 const btnBack = document.getElementById("btn-back");
 const btnForward = document.getElementById("btn-forward");
 const btnReload = document.getElementById("btn-reload");
 const btnHome = document.getElementById("btn-home");
 
+const btnSwitchProxy = document.getElementById("btn-switch-proxy");
+const proxyRouteLabelEl = document.getElementById("proxy-route-label");
 const btnAdblock = document.getElementById("btn-adblock");
-const adblockCountEl = document.getElementById("adblock-count");
 const btnSplitView = document.getElementById("btn-split-view");
-const btnZoomMenu = document.getElementById("btn-zoom-menu");
-const zoomBtnText = document.getElementById("zoom-btn-text");
-const zoomPopoverEl = document.getElementById("zoom-popover");
-const btnZoomOut = document.getElementById("btn-zoom-out");
-const btnZoomIn = document.getElementById("btn-zoom-in");
-const btnZoomReset = document.getElementById("btn-zoom-reset");
-const zoomValueDisplay = document.getElementById("zoom-value-display");
-const selectUaEl = document.getElementById("select-ua");
+const btnMoreMenu = document.getElementById("btn-more-menu");
+const chromeDropdownEl = document.getElementById("chrome-dropdown");
 
-const btnHistory = document.getElementById("btn-history");
-const btnNotes = document.getElementById("btn-notes");
-const btnDevtools = document.getElementById("btn-devtools");
-const btnCommandPalette = document.getElementById("btn-command-palette");
+const menuNewTab = document.getElementById("menu-new-tab");
+const menuDuplicateTab = document.getElementById("menu-duplicate-tab");
+const menuPinTab = document.getElementById("menu-pin-tab");
+const menuReopenClosed = document.getElementById("menu-reopen-closed");
+const menuHistory = document.getElementById("menu-history");
+const menuNotes = document.getElementById("menu-notes");
+const menuSnapshot = document.getElementById("menu-snapshot");
+const menuPopout = document.getElementById("menu-popout");
+const menuCloak = document.getElementById("menu-cloak");
+const menuFullscreen = document.getElementById("menu-fullscreen");
+const menuCommandPalette = document.getElementById("menu-command-palette");
+const menuDevtools = document.getElementById("menu-devtools");
+const menuCustomize = document.getElementById("menu-customize");
+
 const btnCustomize = document.getElementById("btn-customize");
-const btnCloak = document.getElementById("btn-cloak");
-const btnFullscreen = document.getElementById("btn-fullscreen");
 const btnExitFullscreen = document.getElementById("btn-exit-fullscreen");
 
 const bookmarksBarEl = document.getElementById("bookmarks-bar");
 const bookmarksListEl = document.getElementById("bookmarks-list");
-const btnExportSnapshot = document.getElementById("btn-export-snapshot");
-const btnPopoutPip = document.getElementById("btn-popout-pip");
 
 // DevTools DOM
 const devtoolsDockEl = document.getElementById("devtools-dock");
@@ -208,7 +177,6 @@ const devNetworkListEl = document.getElementById("dev-network-list");
 const devConsoleListEl = document.getElementById("dev-console-list");
 const devConsoleForm = document.getElementById("dev-console-form");
 const devConsoleInput = document.getElementById("dev-console-input");
-const inspectorGridEl = document.getElementById("inspector-grid");
 const btnDevClear = document.getElementById("btn-dev-clear");
 const btnDevClose = document.getElementById("btn-dev-close");
 
@@ -235,7 +203,6 @@ const selectDensity = document.getElementById("select-density");
 const selectFont = document.getElementById("select-font");
 const selectBookmarksBar = document.getElementById("select-bookmarks-bar");
 const inputPanicUrl = document.getElementById("input-panic-url");
-const selectTransport = document.getElementById("select-transport");
 const selectSearch = document.getElementById("select-search");
 const btnExportSession = document.getElementById("btn-export-session");
 const btnImportSession = document.getElementById("btn-import-session");
@@ -261,24 +228,14 @@ let sharedHttpCache = null;
 const isLocalhost =
   location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
-let currentEngine = localStorage.getItem(STORAGE_KEYS.engine) || "scramjet";
-if (!ENGINE_LABELS[currentEngine]) currentEngine = "scramjet";
-
-const savedTransport = localStorage.getItem(STORAGE_KEYS.transport);
-let currentTransportKind = !isLocalhost
-  ? "bare"
-  : savedTransport && TRANSPORT_PATHS[savedTransport]
-  ? savedTransport
-  : "bare";
+// Default to "auto" so it automatically selects the working proxy
+let currentEngine = localStorage.getItem(STORAGE_KEYS.engine) || "auto";
+if (!ROUTE_LABELS[currentEngine]) currentEngine = "auto";
 
 let currentSearchTemplate =
   localStorage.getItem(STORAGE_KEYS.searchEngine) ||
   "https://duckduckgo.com/?q=%s";
 let adblockEnabled = localStorage.getItem(STORAGE_KEYS.adblock) !== "0";
-let blockedAdsCount = 0;
-let currentUserAgent = localStorage.getItem(STORAGE_KEYS.userAgent) || "default";
-let currentZoom = 100;
-let currentViewport = "desktop";
 let splitScreenEnabled = false;
 let secondaryTabId = null;
 
@@ -319,23 +276,17 @@ function isAdblockedHost(hostname) {
   );
 }
 
-function incrementBlockedAds(urlStr) {
-  blockedAdsCount++;
-  adblockCountEl.textContent = String(blockedAdsCount);
-  logNetworkEvent("BLOCKED", urlStr, "AdShield");
-}
-
 /**
- * DevTools Logging Helpers
+ * Console & Network Logging
  */
-function logNetworkEvent(method, url, engineOrStatus) {
+function logNetworkEvent(method, url, routeKey) {
   devNetworkLogs.unshift({
     method: method || "GET",
     url: String(url || ""),
-    badge: String(engineOrStatus || currentEngine),
+    badge: ROUTE_LABELS[routeKey] || String(routeKey || "Auto"),
     time: new Date().toLocaleTimeString(),
   });
-  if (devNetworkLogs.length > 120) devNetworkLogs.pop();
+  if (devNetworkLogs.length > 100) devNetworkLogs.pop();
   devNetCountEl.textContent = String(devNetworkLogs.length);
   if (!devtoolsDockEl.hidden) renderDevTools();
 }
@@ -346,14 +297,14 @@ function logConsoleEvent(level, message) {
     message: String(message || ""),
     time: new Date().toLocaleTimeString(),
   });
-  if (devConsoleLogs.length > 150) devConsoleLogs.shift();
+  if (devConsoleLogs.length > 120) devConsoleLogs.shift();
   devConsoleCountEl.textContent = String(devConsoleLogs.length);
   if (!devtoolsDockEl.hidden) renderDevTools();
 }
 
 function renderDevTools() {
   devNetworkListEl.replaceChildren(
-    ...devNetworkLogs.slice(0, 60).map((item) => {
+    ...devNetworkLogs.slice(0, 50).map((item) => {
       const row = document.createElement("div");
       row.className = "dev-row";
       row.innerHTML = `<span class="dev-row__badge">${escapeHtml(
@@ -381,28 +332,6 @@ function renderDevTools() {
       return row;
     })
   );
-
-  const active = getActiveTab();
-  const cards = [
-    { label: "Active Proxy Engine", value: ENGINE_LABELS[active?.engine || currentEngine] },
-    { label: "Low-Level Transport", value: currentTransportKind.toUpperCase() },
-    { label: "COOP/COEP Isolation", value: self.crossOriginIsolated ? "Active (SharedArrayBuffer Ready)" : "Standard" },
-    { label: "User-Agent Spoof", value: currentUserAgent.toUpperCase() },
-    { label: "Ad & Tracker Shield", value: `${adblockEnabled ? "Enabled" : "Paused"} (${blockedAdsCount} blocked)` },
-    { label: "Viewport & Zoom", value: `${currentViewport.toUpperCase()} @ ${currentZoom}%` },
-    { label: "Active Target URL", value: active?.url || "Launchpad (Idle)" },
-  ];
-
-  inspectorGridEl.replaceChildren(
-    ...cards.map((c) => {
-      const div = document.createElement("div");
-      div.className = "inspector-card";
-      div.innerHTML = `<small>${escapeHtml(c.label)}</small><strong>${escapeHtml(
-        c.value
-      )}</strong>`;
-      return div;
-    })
-  );
 }
 
 function escapeHtml(str) {
@@ -414,7 +343,7 @@ function escapeHtml(str) {
 }
 
 /**
- * Apply & Persist 5 Customization Suites
+ * Apply & Persist Customizations
  */
 function applyCustomizationsFromStorage() {
   // 1. Theme
@@ -424,7 +353,7 @@ function applyCustomizationsFromStorage() {
     btn.classList.toggle("is-active", btn.dataset.themeVal === theme);
   });
 
-  // 2. Custom Accent & Glow
+  // 2. Accent & Glow
   const savedAccent = localStorage.getItem(STORAGE_KEYS.accentColor);
   if (savedAccent) {
     htmlEl.style.setProperty("--accent", savedAccent);
@@ -440,7 +369,7 @@ function applyCustomizationsFromStorage() {
   inputGlowIntensity.value = String(glowNum);
   glowValLabel.textContent = `${glowNum}%`;
 
-  // 3. Tab Cloak / Disguise
+  // 3. Tab Cloak
   const cloakPreset = localStorage.getItem(STORAGE_KEYS.cloakPreset) || "default";
   const customTitle = localStorage.getItem(STORAGE_KEYS.customTitle) || "";
   const customFavicon = localStorage.getItem(STORAGE_KEYS.customFavicon) || "";
@@ -453,14 +382,14 @@ function applyCustomizationsFromStorage() {
     faviconEl.href = customFavicon || preset.icon;
   }
 
-  // 4. Background Style & Custom URL
+  // 4. Wallpaper & Ambient Style
   const bgStyle = localStorage.getItem(STORAGE_KEYS.bgStyle) || "aurora";
   const bgUrl = localStorage.getItem(STORAGE_KEYS.bgUrl) || "";
   htmlEl.setAttribute("data-bg", bgStyle);
   selectBgStyle.value = bgStyle;
   inputBgUrl.value = bgUrl;
   if (bgStyle === "custom" && bgUrl) {
-    ambientBgEl.style.backgroundImage = `linear-gradient(rgba(9,10,15,0.72), rgba(9,10,15,0.82)), url("${bgUrl.replace(/"/g, "")}")`;
+    ambientBgEl.style.backgroundImage = `linear-gradient(rgba(9,10,15,0.68), rgba(9,10,15,0.78)), url("${bgUrl.replace(/"/g, "")}")`;
   } else {
     ambientBgEl.style.removeProperty("background-image");
   }
@@ -480,44 +409,15 @@ function applyCustomizationsFromStorage() {
   bookmarksBarEl.classList.toggle("is-hidden", bbar === "hide");
   inputPanicUrl.value = panicUrl;
 
-  // Sync Engine, Transport, Search, Adblock, UserAgent UI
-  selectEngineEl.value = currentEngine;
-  selectTransport.value = currentTransportKind;
   selectSearch.value = currentSearchTemplate;
-  selectUaEl.value = currentUserAgent;
   btnAdblock.classList.toggle("is-active", adblockEnabled);
-  adblockCountEl.textContent = String(blockedAdsCount);
   scratchpadTextarea.value = localStorage.getItem(STORAGE_KEYS.notes) || "";
 
-  syncEnginePillsUI();
-  updateFooterMetadata();
+  syncProxyRouteLabel();
 }
 
-function syncEnginePillsUI() {
-  selectEngineEl.value = currentEngine;
-  launchpadEnginePills.querySelectorAll(".engine-chip").forEach((chip) => {
-    chip.classList.toggle("is-active", chip.dataset.engine === currentEngine);
-  });
-}
-
-function updateFooterMetadata() {
-  const transportLabels = {
-    bare: "Bare V3 HTTP",
-    epoxy: "Epoxy TLS / Wisp",
-    libcurl: "Libcurl.js / Wisp",
-  };
-  footerEngineEl.innerHTML = `<strong>Engine:</strong> ${
-    ENGINE_LABELS[currentEngine] || "Scramjet 2.0"
-  }`;
-  footerTransportEl.innerHTML = `<strong>Transport:</strong> ${
-    transportLabels[currentTransportKind] || transportLabels.bare
-  }`;
-  footerIsolationEl.innerHTML = `<strong>Isolation:</strong> ${
-    self.crossOriginIsolated ? "COOP/COEP Active" : "Standard"
-  }`;
-  footerShieldEl.innerHTML = `<strong>AdShield:</strong> ${
-    adblockEnabled ? `Active (${blockedAdsCount})` : "Paused"
-  }`;
+function syncProxyRouteLabel() {
+  proxyRouteLabelEl.textContent = ROUTE_LABELS[currentEngine] || "Auto";
 }
 
 /**
@@ -527,7 +427,6 @@ function resolveInput(rawInput) {
   const text = String(rawInput ?? "").trim();
   if (!text) return null;
 
-  // Check search bangs (e.g. "!yt veritasium" or "!w quantum computing")
   const parts = text.split(/\s+/);
   const firstWord = parts[0].toLowerCase();
   if (SEARCH_BANGS[firstWord] && parts.length > 1) {
@@ -562,17 +461,12 @@ function formatHostnameOrTitle(urlStr) {
   }
 }
 
-function getWispUrl() {
-  const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  return `${proto}//${location.host}/wisp/`;
-}
-
 function getBareUrl() {
   return new URL("/bare/", location.origin).href;
 }
 
 /**
- * Hardened Bare V3 Transport with AdShield, User-Agent Spoofing & DevTools Network Hooks
+ * Hardened HTTP Transport
  */
 const BARE_MAX_HEADER_VALUE = 3072;
 const BARE_STRIP_RESPONSE_HEADERS = new Set([
@@ -672,9 +566,6 @@ class HardenedBareTransport {
       }
     }
     headerMap["Host"] = remote.host;
-    if (currentUserAgent !== "default" && USER_AGENT_STRINGS[currentUserAgent]) {
-      headerMap["User-Agent"] = USER_AGENT_STRINGS[currentUserAgent];
-    }
 
     const headers = new Headers();
     headers.set("x-bare-url", remote.toString());
@@ -716,9 +607,8 @@ class HardenedBareTransport {
     const remoteUrl = remote instanceof URL ? remote : new URL(String(remote));
     const upperMethod = String(method || "GET").toUpperCase();
 
-    // AdShield check inside Bare transport
     if (isAdblockedHost(remoteUrl.hostname)) {
-      incrementBlockedAds(remoteUrl.href);
+      logNetworkEvent("BLOCKED", remoteUrl.href, "Shield");
       return {
         body: null,
         headers: [],
@@ -727,7 +617,7 @@ class HardenedBareTransport {
       };
     }
 
-    logNetworkEvent(upperMethod, remoteUrl.href, "Scramjet");
+    logNetworkEvent(upperMethod, remoteUrl.href, "scramjet");
 
     const bareHeaders = this.createBareRequestHeaders(remoteUrl, headers);
 
@@ -783,17 +673,7 @@ class HardenedBareTransport {
     const xBareStatus = joined.get("x-bare-status");
 
     if (!response.ok && xBareStatus === null) {
-      const errText = await response.text().catch(() => "");
-      let errMsg = `Bare server responded with HTTP ${response.status}`;
-      try {
-        const parsed = JSON.parse(errText);
-        if (parsed?.message) errMsg = parsed.message;
-      } catch {
-        if (errText && !errText.trim().startsWith("<")) {
-          errMsg = errText.slice(0, 160);
-        }
-      }
-      throw new Error(errMsg);
+      throw new Error(`HTTP ${response.status}`);
     }
 
     const status = xBareStatus
@@ -846,13 +726,11 @@ class HardenedBareTransport {
         cleanup();
         try {
           if (typeof event.data !== "string") {
-            onerror?.(new TypeError("Invalid Bare WebSocket handshake frame"));
             ws.close();
             return;
           }
           const message = JSON.parse(event.data);
           if (message.type !== "open") {
-            onerror?.(new Error("Bare WebSocket did not open"));
             ws.close();
             return;
           }
@@ -906,20 +784,6 @@ class HardenedBareTransport {
   }
 }
 
-async function createTransport(kind) {
-  if (kind === "bare" || !TRANSPORT_PATHS[kind]) {
-    return new HardenedBareTransport(getBareUrl());
-  }
-  const modulePath = TRANSPORT_PATHS[kind];
-  const mod = await import(modulePath);
-  const TransportClass = mod.default;
-  const transport = new TransportClass({ wisp: getWispUrl() });
-  if (!transport.ready && typeof transport.init === "function") {
-    await transport.init();
-  }
-  return transport;
-}
-
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) {
     throw new Error("Service Workers require HTTPS or localhost.");
@@ -945,7 +809,7 @@ async function registerServiceWorker() {
 
   const sw = navigator.serviceWorker.controller ?? readyReg.active;
   if (!sw) {
-    throw new Error("Service Worker registered but failed to activate.");
+    throw new Error("Service Worker failed to activate.");
   }
   return sw;
 }
@@ -956,10 +820,9 @@ async function ensureEngineReady() {
 
   engineReadyPromise = (async () => {
     try {
-      statusTextEl.textContent = "Booting Multi-Proxy Engine (Scramjet + UV + Aero)...";
       const [serviceworker, transport] = await Promise.all([
         registerServiceWorker(),
-        createTransport(currentTransportKind),
+        new HardenedBareTransport(getBareUrl()),
       ]);
 
       const { Controller } = globalThis.$scramjetController;
@@ -986,27 +849,14 @@ async function ensureEngineReady() {
         });
       }, 15000);
 
-      updateStatusPillReady();
       return ctrl;
     } catch (err) {
       engineReadyPromise = null;
-      statusPillEl.classList.remove("is-ready");
-      statusPillEl.classList.add("is-ready");
-      statusTextEl.textContent = `Server Engines Ready (UV / Aero / Direct Active)`;
-      console.warn("[LucasProx] Scramjet SW fallback mode:", err);
       throw err;
     }
   })();
 
   return engineReadyPromise;
-}
-
-function updateStatusPillReady() {
-  statusPillEl.classList.remove("is-error");
-  statusPillEl.classList.add("is-ready");
-  statusTextEl.textContent = `${
-    ENGINE_LABELS[currentEngine] || "Scramjet 2.0"
-  } Ready • ${currentTransportKind.toUpperCase()} Active`;
 }
 
 function createPageLifecyclePlugin(onTitle, onReady, onError) {
@@ -1070,14 +920,8 @@ function createPageLifecyclePlugin(onTitle, onReady, onError) {
   return new PageLifecyclePlugin();
 }
 
-/**
- * Construct Server/UV Proxy URL for non-Scramjet engines (uv, aero, direct, reader)
- */
 function buildServerEngineIframeSrc(targetUrl, engineKind) {
   const params = new URLSearchParams();
-  if (currentUserAgent && currentUserAgent !== "default") {
-    params.set("ua", currentUserAgent);
-  }
   if (adblockEnabled) {
     params.set("adblock", "1");
   }
@@ -1095,9 +939,6 @@ function buildServerEngineIframeSrc(targetUrl, engineKind) {
   return `/api/proxy?${params.toString()}`;
 }
 
-/**
- * Listen for postMessage events from Ultraviolet / AeroStream / DirectEdge / ReaderLite iframes
- */
 window.addEventListener("message", (event) => {
   const data = event.data;
   if (!data || typeof data !== "object") return;
@@ -1123,7 +964,7 @@ window.addEventListener("message", (event) => {
 });
 
 /**
- * Tab Management (Supports Pinning, Duplication, Split-Screen, Reopen Closed)
+ * Tab Management
  */
 function getActiveTab() {
   return tabs.find((t) => t.id === activeTabId) || null;
@@ -1133,7 +974,7 @@ function createTab({ select = true, url = "", engine = currentEngine } = {}) {
   const id = `tab-${++tabCounter}`;
   const iframe = document.createElement("iframe");
   iframe.className = "proxy-frame";
-  iframe.setAttribute("title", `LucasProx Tab ${tabCounter}`);
+  iframe.setAttribute("title", `Tab ${tabCounter}`);
   framesStageEl.appendChild(iframe);
 
   const tab = {
@@ -1157,15 +998,7 @@ function createTab({ select = true, url = "", engine = currentEngine } = {}) {
     }
   });
 
-  // Make clicking a frame in split-screen mode focus that tab
-  iframe.addEventListener("mouseenter", () => {
-    if (splitScreenEnabled && !tab.showLaunchpad && tab.id !== activeTabId) {
-      // Allow easy interaction with split frame
-    }
-  });
-
   tabs.push(tab);
-  applyZoomToIframe(iframe);
 
   if (select) {
     selectTab(id);
@@ -1189,9 +1022,9 @@ function selectTab(id) {
   if (active) {
     addressInput.value = active.url;
     heroInput.value = active.showLaunchpad ? "" : active.url;
-    if (active.engine && ENGINE_LABELS[active.engine]) {
+    if (active.engine && ROUTE_LABELS[active.engine]) {
       currentEngine = active.engine;
-      syncEnginePillsUI();
+      syncProxyRouteLabel();
     }
   }
 
@@ -1202,7 +1035,6 @@ function closeTab(id) {
   const index = tabs.findIndex((t) => t.id === id);
   if (index === -1) return;
 
-  // Prevent closing pinned tab unless forced
   const [removed] = tabs.splice(index, 1);
   if (removed.url) {
     closedTabsStack.push({
@@ -1248,7 +1080,6 @@ function recordTabUrl(tab, url) {
     tab.title = formatHostnameOrTitle(url);
   }
 
-  // Record in persistent history
   addHistoryEntry(url, tab.title, tab.engine || currentEngine);
 
   if (tab.history[tab.historyIndex] === url) return;
@@ -1314,12 +1145,8 @@ async function ensureTabScramjetFrame(tab) {
     },
     () => {
       tab.loading = false;
-      // If in Auto-Switch mode and Scramjet fails, automatically failover to Ultraviolet!
-      if (tab.engine === "auto" && tab.url) {
-        logConsoleEvent(
-          "warn",
-          `Auto-Switch failover triggered for ${tab.url} -> Switching to Ultraviolet (UV)`
-        );
+      // Seamless automatic failover to Proxy 2 if Auto or Proxy 1 encounters an upstream issue
+      if ((tab.engine === "auto" || tab.engine === "scramjet") && tab.url) {
         tab.iframe.src = buildServerEngineIframeSrc(tab.url, "uv");
       }
       renderUI();
@@ -1334,7 +1161,7 @@ async function ensureTabScramjetFrame(tab) {
 }
 
 /**
- * Navigate Tab using Selected Proxy Engine (Scramjet 2.0, Ultraviolet, AeroStream, DirectEdge, ReaderLite, or Auto)
+ * Navigate Tab (Auto-selects working proxy or uses currently cycled proxy)
  */
 async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngine = null } = {}) {
   const targetUrl = resolveInput(rawInput);
@@ -1345,7 +1172,7 @@ async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngin
     targetTab = createTab({ select: true });
   }
 
-  const engineToUse = forceEngine || currentEngine || "scramjet";
+  const engineToUse = forceEngine || currentEngine || "auto";
   targetTab.engine = engineToUse;
   targetTab.showLaunchpad = false;
   targetTab.loading = true;
@@ -1364,37 +1191,30 @@ async function navigateTo(rawInput, { pushHistory = true, tab = null, forceEngin
   heroInput.blur();
   renderUI();
 
-  // Route via selected engine
-  if (engineToUse === "scramjet" || engineToUse === "auto") {
+  if (engineToUse === "auto" || engineToUse === "scramjet") {
     try {
       const sjFrame = await ensureTabScramjetFrame(targetTab);
       sjFrame.go(targetUrl);
       return;
-    } catch (err) {
-      logConsoleEvent(
-        "warn",
-        `Scramjet unavailable (${err?.message || err}), falling back to Ultraviolet (UV)`
-      );
+    } catch {
       const fallbackSrc = buildServerEngineIframeSrc(targetUrl, "uv");
-      logNetworkEvent("GET", targetUrl, "UV-Failover");
+      logNetworkEvent("GET", targetUrl, "uv");
       targetTab.iframe.src = fallbackSrc;
       return;
     }
   }
 
-  // Server-powered proxy engines: Ultraviolet (uv), AeroStream (aero), DirectEdge (direct), ReaderLite (reader)
   const serverSrc = buildServerEngineIframeSrc(targetUrl, engineToUse);
-  logNetworkEvent("GET", targetUrl, ENGINE_LABELS[engineToUse] || engineToUse);
+  logNetworkEvent("GET", targetUrl, engineToUse);
   targetTab.iframe.src = serverSrc;
 }
 
 /**
- * Render Tab Strip, Bookmarks, Shortcuts, Split-Screen, and Toolbar State
+ * Render Chrome Tab Strip, Bookmarks, Shortcuts & Viewport
  */
 function renderUI() {
   const active = getActiveTab();
 
-  // Sort pinned tabs first
   const orderedTabs = [
     ...tabs.filter((t) => t.pinned),
     ...tabs.filter((t) => !t.pinned),
@@ -1415,30 +1235,12 @@ function renderUI() {
     const dot = document.createElement("span");
     dot.className = "tab__dot";
 
-    const engineBadge = document.createElement("span");
-    engineBadge.className = "tab__engine-tag";
-    const shortEngine =
-      tab.engine === "scramjet"
-        ? "SJ"
-        : tab.engine === "uv"
-        ? "UV"
-        : tab.engine === "aero"
-        ? "AE"
-        : tab.engine === "direct"
-        ? "DE"
-        : tab.engine === "reader"
-        ? "RD"
-        : "AU";
-    engineBadge.textContent = tab.pinned ? `📌` : shortEngine;
-
     const titleSpan = document.createElement("span");
     titleSpan.className = "tab__title";
-    titleSpan.textContent = tab.title || "New Tab";
-    titleSpan.title = `${tab.title} (${ENGINE_LABELS[tab.engine] || "Scramjet"})\n${
-      tab.url || "Launchpad"
-    }`;
+    titleSpan.textContent = tab.pinned ? "📌" : tab.title || "New Tab";
+    titleSpan.title = tab.url || tab.title;
 
-    btn.append(dot, engineBadge, titleSpan);
+    btn.append(dot, titleSpan);
 
     if (!tab.pinned || tabs.length === 1) {
       const closeBtn = document.createElement("button");
@@ -1468,19 +1270,13 @@ function renderUI() {
 
   if (!active) return;
 
-  // Toggle Pin button state
-  btnPinTab.classList.toggle("is-active", Boolean(active.pinned));
-
-  // Toggle Bookmark star state
   const isBookmarked =
     active.url && bookmarks.some((b) => b.url === active.url);
   btnBookmarkStar.textContent = isBookmarked ? "★" : "☆";
   btnBookmarkStar.classList.toggle("is-starred", Boolean(isBookmarked));
 
-  // Toggle Reader button state
   btnReaderToggle.classList.toggle("is-active", active.engine === "reader");
 
-  // Launchpad vs Iframe stage visibility
   const anySplitVisible =
     splitScreenEnabled &&
     secondaryTabId &&
@@ -1506,13 +1302,9 @@ function renderUI() {
   btnForward.disabled =
     active.historyIndex < 0 || active.historyIndex >= active.history.length - 1;
 
-  updateFooterMetadata();
   if (!devtoolsDockEl.hidden) renderDevTools();
 }
 
-/**
- * Render Bookmarks Bar & Launchpad Shortcuts
- */
 function renderBookmarks() {
   const nodes = bookmarks.map((bm, idx) => {
     const btn = document.createElement("button");
@@ -1521,7 +1313,7 @@ function renderBookmarks() {
     btn.title = bm.url;
 
     const label = document.createElement("span");
-    label.textContent = `★ ${bm.title}`;
+    label.textContent = bm.title;
 
     const del = document.createElement("span");
     del.className = "bookmark-pill__del";
@@ -1550,14 +1342,11 @@ function renderShortcuts() {
 
     const icon = document.createElement("span");
     icon.className = "quick-icon";
-    icon.textContent = (item.icon || item.title?.[0] || "⚡").toUpperCase();
+    icon.textContent = (item.icon || item.title?.[0] || "•").toUpperCase();
 
-    const info = document.createElement("div");
-    info.className = "quick-card__info";
     const title = document.createElement("span");
     title.className = "quick-card__title";
     title.textContent = item.title;
-    info.appendChild(title);
 
     const delBtn = document.createElement("button");
     delBtn.type = "button";
@@ -1571,16 +1360,38 @@ function renderShortcuts() {
       renderShortcuts();
     });
 
-    card.append(icon, info, delBtn);
+    card.append(icon, title, delBtn);
     card.addEventListener("click", () => void navigateTo(item.url));
     return card;
   });
+
+  // Add Chrome-style "+ Add shortcut" button at the end of the grid
+  const addCard = document.createElement("div");
+  addCard.className = "quick-card";
+  addCard.tabIndex = 0;
+  addCard.innerHTML = `<span class="quick-icon">+</span><span class="quick-card__title">Add shortcut</span>`;
+  addCard.addEventListener("click", () => promptAddShortcut());
+  nodes.push(addCard);
+
   quickGridEl.replaceChildren(...nodes);
 }
 
-/**
- * Omnibox Autocomplete & Search Bang Suggestions
- */
+function promptAddShortcut() {
+  const urlInput = window.prompt("Enter website URL:", "https://");
+  if (!urlInput) return;
+  const resolved = resolveInput(urlInput);
+  if (!resolved) return;
+  const defaultTitle = formatHostnameOrTitle(resolved);
+  const titleInput = window.prompt("Name:", defaultTitle) || defaultTitle;
+  shortcuts.push({
+    title: titleInput,
+    url: resolved,
+    icon: titleInput[0]?.toUpperCase() || "•",
+  });
+  saveJsonStorage(STORAGE_KEYS.shortcuts, shortcuts);
+  renderShortcuts();
+}
+
 function updateOmniboxSuggestions(query) {
   const q = String(query || "").trim().toLowerCase();
   if (!q) {
@@ -1590,7 +1401,6 @@ function updateOmniboxSuggestions(query) {
 
   const matches = [];
 
-  // Bang hints
   for (const [bang, tpl] of Object.entries(SEARCH_BANGS)) {
     if (bang.startsWith(q) || q.startsWith(bang + " ")) {
       matches.push({
@@ -1601,26 +1411,24 @@ function updateOmniboxSuggestions(query) {
     }
   }
 
-  // Bookmarks & Shortcuts
   for (const bm of [...bookmarks, ...shortcuts]) {
     if (
       bm.title.toLowerCase().includes(q) ||
       bm.url.toLowerCase().includes(q)
     ) {
       if (!matches.some((m) => m.value === bm.url)) {
-        matches.push({ label: `★ ${bm.title}`, sub: bm.url, value: bm.url });
+        matches.push({ label: bm.title, sub: bm.url, value: bm.url });
       }
     }
   }
 
-  // History
   for (const h of historyEntries.slice(0, 30)) {
     if (
       h.title.toLowerCase().includes(q) ||
       h.url.toLowerCase().includes(q)
     ) {
       if (!matches.some((m) => m.value === h.url)) {
-        matches.push({ label: `🕒 ${h.title}`, sub: h.url, value: h.url });
+        matches.push({ label: h.title, sub: h.url, value: h.url });
       }
     }
   }
@@ -1651,166 +1459,110 @@ function updateOmniboxSuggestions(query) {
 }
 
 /**
- * Page Zoom & Viewport Simulator
- */
-function applyZoomToIframe(iframe) {
-  if (!iframe) return;
-  iframe.style.zoom = `${currentZoom}%`;
-}
-
-function setPageZoom(nextZoom) {
-  currentZoom = Math.min(200, Math.max(50, nextZoom));
-  zoomBtnText.textContent = `${currentZoom}%`;
-  zoomValueDisplay.textContent = `${currentZoom}%`;
-  tabs.forEach((t) => applyZoomToIframe(t.iframe));
-}
-
-/**
- * Switch Active Proxy Engine
+ * One-Click Cycle Proxy Route
  */
 function setProxyEngine(nextEngine, { reloadCurrent = true } = {}) {
-  if (!ENGINE_LABELS[nextEngine]) return;
+  if (!ROUTE_LABELS[nextEngine]) return;
   currentEngine = nextEngine;
   localStorage.setItem(STORAGE_KEYS.engine, nextEngine);
-  syncEnginePillsUI();
-  updateStatusPillReady();
-  updateFooterMetadata();
+  syncProxyRouteLabel();
 
   const active = getActiveTab();
   if (active) {
     active.engine = nextEngine;
     if (reloadCurrent && active.url && !active.showLaunchpad) {
-      void navigateTo(active.url, { pushHistory: false, tab: active, forceEngine: nextEngine });
+      void navigateTo(active.url, {
+        pushHistory: false,
+        tab: active,
+        forceEngine: nextEngine,
+      });
     } else {
       renderUI();
     }
   }
 }
 
+function cycleNextProxy() {
+  const idx = PROXY_CYCLE_ORDER.indexOf(currentEngine);
+  const next =
+    PROXY_CYCLE_ORDER[(idx + 1) % PROXY_CYCLE_ORDER.length] || "auto";
+  setProxyEngine(next, { reloadCurrent: true });
+}
+
 /**
- * Command Palette (Ctrl+P / Cmd+P)
+ * Command Bar Actions
  */
 function getCommandPaletteActions() {
   return [
     {
-      title: "⚡ Switch Proxy Engine → Scramjet 2.0 (Wasm SW)",
-      tag: "Engine",
-      run: () => setProxyEngine("scramjet"),
+      title: "Switch Proxy Route (Cycle Next)",
+      tag: ROUTE_LABELS[currentEngine] || "Auto",
+      run: () => cycleNextProxy(),
     },
     {
-      title: "🟣 Switch Proxy Engine → Ultraviolet (UV XOR)",
-      tag: "Engine",
-      run: () => setProxyEngine("uv"),
-    },
-    {
-      title: "🌊 Switch Proxy Engine → AeroStream (Stealth Rewriter)",
-      tag: "Engine",
-      run: () => setProxyEngine("aero"),
-    },
-    {
-      title: "🚀 Switch Proxy Engine → DirectEdge (Fast Server Stream)",
-      tag: "Engine",
-      run: () => setProxyEngine("direct"),
-    },
-    {
-      title: "📖 Switch Proxy Engine → ReaderLite (Distraction-Free Text)",
-      tag: "Engine",
-      run: () => setProxyEngine("reader"),
-    },
-    {
-      title: "🔄 Switch Proxy Engine → Smart Auto-Switch (Failover)",
-      tag: "Engine",
+      title: "Use Auto Proxy Selection (Recommended)",
+      tag: "Auto",
       run: () => setProxyEngine("auto"),
     },
     {
-      title: "➕ Open New Proxy Tab",
-      tag: "Ctrl+T",
+      title: "New Tab",
+      tag: "⌘T",
       run: () => createTab({ select: true }),
     },
     {
-      title: "🪟 Toggle Split-Screen Dual View",
-      tag: "Split View",
+      title: "Toggle Split Screen",
+      tag: "Split",
       run: () => toggleSplitScreen(),
     },
     {
-      title: "🛡 Toggle Ad & Tracker Shield",
+      title: "Toggle Clean Reader View",
+      tag: "Reader",
+      run: () => btnReaderToggle.click(),
+    },
+    {
+      title: "Toggle Ad & Tracker Blocker",
       tag: adblockEnabled ? "On" : "Off",
       run: () => toggleAdblock(),
     },
     {
-      title: "💻 Toggle Built-in Proxy DevTools & Inspector",
-      tag: "F12",
-      run: () => toggleDevTools(),
-    },
-    {
-      title: "🎨 Open Customization Studio & Themes",
-      tag: "Studio",
+      title: "Customize Theme & Appearance",
+      tag: "Customize",
       run: () => (customizeModal.hidden = false),
     },
     {
-      title: "🕵️ Cloak LucasProx in about:blank Popup",
-      tag: "Stealth",
+      title: "Open in about:blank Cloak",
+      tag: "Cloak",
       run: () => openAboutBlankCloak(),
     },
     {
-      title: "📄 Disguise Tab as Google Docs",
+      title: "Disguise Tab as Google Docs",
       tag: "Cloak",
       run: () => applyCloakPreset("docs"),
     },
     {
-      title: "🎓 Disguise Tab as Google Classroom",
+      title: "Disguise Tab as Google Classroom",
       tag: "Cloak",
       run: () => applyCloakPreset("classroom"),
     },
     {
-      title: "🚨 Trigger Panic Redirect Now",
+      title: "Quick Exit (Panic Redirect)",
       tag: "F2 / `",
       run: () => triggerPanicRedirect(),
     },
     {
-      title: "↩ Reopen Last Closed Tab",
-      tag: "Ctrl+Shift+T",
+      title: "Reopen Closed Tab",
+      tag: "⌘⇧T",
       run: () => reopenLastClosedTab(),
     },
     {
-      title: "🕒 Open Browsing History Drawer",
-      tag: "Ctrl+H",
+      title: "Open History",
+      tag: "⌘H",
       run: () => openHistoryDrawer(),
     },
     {
-      title: "📝 Open Quick Scratchpad Notes",
+      title: "Open Quick Notes",
       tag: "Notes",
       run: () => (notesDrawer.hidden = false),
-    },
-    {
-      title: "🌙 Theme: Midnight Stealth",
-      tag: "Theme",
-      run: () => setTheme("midnight"),
-    },
-    {
-      title: "⚡ Theme: Cyberpunk Neon",
-      tag: "Theme",
-      run: () => setTheme("cyberpunk"),
-    },
-    {
-      title: "❄️ Theme: Nordic Frost",
-      tag: "Theme",
-      run: () => setTheme("nord"),
-    },
-    {
-      title: "🧛 Theme: Dracula Pro",
-      tag: "Theme",
-      run: () => setTheme("dracula"),
-    },
-    {
-      title: "🟢 Theme: Emerald Matrix",
-      tag: "Theme",
-      run: () => setTheme("matrix"),
-    },
-    {
-      title: "⚫ Theme: OLED Pitch Black",
-      tag: "Theme",
-      run: () => setTheme("oled"),
     },
   ];
 }
@@ -1850,7 +1602,7 @@ function renderCommandPaletteResults(filterText) {
 }
 
 /**
- * Feature Helpers (Split Screen, Adblock, Panic, Cloak, History, Snapshot, PiP)
+ * Feature Helpers
  */
 function toggleSplitScreen() {
   splitScreenEnabled = !splitScreenEnabled;
@@ -1878,12 +1630,10 @@ function toggleAdblock() {
   adblockEnabled = !adblockEnabled;
   localStorage.setItem(STORAGE_KEYS.adblock, adblockEnabled ? "1" : "0");
   btnAdblock.classList.toggle("is-active", adblockEnabled);
-  updateFooterMetadata();
 }
 
 function toggleDevTools() {
   devtoolsDockEl.hidden = !devtoolsDockEl.hidden;
-  btnDevtools.classList.toggle("is-active", !devtoolsDockEl.hidden);
   if (!devtoolsDockEl.hidden) renderDevTools();
 }
 
@@ -1943,7 +1693,7 @@ function renderHistoryList(filterText) {
     : historyEntries;
 
   if (items.length === 0) {
-    historyListEl.innerHTML = `<p class="drawer-hint">No browsing history matching filter.</p>`;
+    historyListEl.innerHTML = `<p class="drawer-hint">No browsing history yet.</p>`;
     return;
   }
 
@@ -1958,22 +1708,54 @@ function renderHistoryList(filterText) {
       });
       btn.innerHTML = `<div class="history-item__top"><span>${escapeHtml(
         h.title
-      )}</span><small>${escapeHtml(
-        ENGINE_LABELS[h.engine] || h.engine
-      )} • ${escapeHtml(timeStr)}</small></div><div class="history-item__url">${escapeHtml(
+      )}</span><small>${escapeHtml(timeStr)}</small></div><div class="history-item__url">${escapeHtml(
         h.url
       )}</div>`;
       btn.addEventListener("click", () => {
         historyDrawer.hidden = true;
-        void navigateTo(h.url, { forceEngine: h.engine });
+        void navigateTo(h.url);
       });
       return btn;
     })
   );
 }
 
+async function exportSnapshotOrCopyLink() {
+  const active = getActiveTab();
+  if (!active || !active.url) {
+    alert("Open a website first to save or copy its link.");
+    return;
+  }
+  try {
+    const docHtml = active.iframe.contentDocument?.documentElement?.outerHTML;
+    if (docHtml) {
+      const blob = new Blob([docHtml], { type: "text/html;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${formatHostnameOrTitle(active.url)}.html`;
+      a.click();
+      return;
+    }
+  } catch {}
+  const shareUrl = `${location.origin}/?url=${encodeURIComponent(active.url)}`;
+  await navigator.clipboard?.writeText(shareUrl).catch(() => {});
+  alert(`Link copied to clipboard:\n${shareUrl}`);
+}
+
+function openPopoutWindow() {
+  const active = getActiveTab();
+  const target = active?.url
+    ? `${location.origin}/?url=${encodeURIComponent(active.url)}`
+    : location.href;
+  window.open(
+    target,
+    "LucasProxMini",
+    "width=480,height=680,menubar=no,toolbar=no,location=no,status=no"
+  );
+}
+
 /**
- * Live Latency / Ping Health Monitor
+ * Live Server Latency Ping
  */
 async function measureServerPing() {
   const start = performance.now();
@@ -2033,36 +1815,13 @@ heroForm.addEventListener("submit", (e) => {
   void navigateTo(heroInput.value);
 });
 
-selectEngineEl.addEventListener("change", () => {
-  setProxyEngine(selectEngineEl.value, { reloadCurrent: true });
-});
-
-launchpadEnginePills.querySelectorAll(".engine-chip").forEach((chip) => {
-  chip.addEventListener("click", () => {
-    setProxyEngine(chip.dataset.engine, { reloadCurrent: true });
-  });
+btnSwitchProxy.addEventListener("click", () => {
+  cycleNextProxy();
 });
 
 btnNewTab.addEventListener("click", () => {
   createTab({ select: true });
   heroInput.focus();
-});
-
-btnDuplicateTab.addEventListener("click", () => {
-  const active = getActiveTab();
-  if (!active) return;
-  createTab({
-    select: true,
-    url: active.url,
-    engine: active.engine || currentEngine,
-  });
-});
-
-btnPinTab.addEventListener("click", () => {
-  const active = getActiveTab();
-  if (!active) return;
-  active.pinned = !active.pinned;
-  renderUI();
 });
 
 btnPanic.addEventListener("click", () => triggerPanicRedirect());
@@ -2100,7 +1859,11 @@ btnForward.addEventListener("click", () => {
 btnReload.addEventListener("click", () => {
   const active = getActiveTab();
   if (!active) return;
-  if (active.engine === "scramjet" && active.sjFrame && !active.showLaunchpad) {
+  if (
+    (active.engine === "scramjet" || active.engine === "auto") &&
+    active.sjFrame &&
+    !active.showLaunchpad
+  ) {
     active.loading = true;
     renderUI();
     active.sjFrame.reload();
@@ -2109,7 +1872,6 @@ btnReload.addEventListener("click", () => {
   }
 });
 
-// Bookmark Star Toggle
 btnBookmarkStar.addEventListener("click", () => {
   const active = getActiveTab();
   const url = active?.url || resolveInput(addressInput.value);
@@ -2128,71 +1890,65 @@ btnBookmarkStar.addEventListener("click", () => {
   renderUI();
 });
 
-// ReaderLite Mode Quick Toggle
 btnReaderToggle.addEventListener("click", () => {
   const active = getActiveTab();
   if (!active || !active.url) {
-    setProxyEngine(currentEngine === "reader" ? "scramjet" : "reader");
+    setProxyEngine(currentEngine === "reader" ? "auto" : "reader");
     return;
   }
-  const nextEngine = active.engine === "reader" ? "scramjet" : "reader";
+  const nextEngine = active.engine === "reader" ? "auto" : "reader";
   setProxyEngine(nextEngine, { reloadCurrent: true });
 });
 
-// Add Custom Quick Launch Shortcut
-btnAddShortcut.addEventListener("click", () => {
-  const urlInput = window.prompt(
-    "Enter website URL for your new Launchpad shortcut:",
-    "https://"
-  );
-  if (!urlInput) return;
-  const resolved = resolveInput(urlInput);
-  if (!resolved) return;
-  const defaultTitle = formatHostnameOrTitle(resolved);
-  const titleInput =
-    window.prompt("Shortcut Name:", defaultTitle) || defaultTitle;
-  shortcuts.push({
-    title: titleInput,
-    url: resolved,
-    icon: titleInput[0]?.toUpperCase() || "⚡",
-  });
-  saveJsonStorage(STORAGE_KEYS.shortcuts, shortcuts);
-  renderShortcuts();
-});
-
-// Adblock, Split View, Zoom/Viewport, History, Notes, DevTools, Command Palette, Studio
 btnAdblock.addEventListener("click", () => toggleAdblock());
 btnSplitView.addEventListener("click", () => toggleSplitScreen());
 
-btnZoomMenu.addEventListener("click", () => {
-  zoomPopoverEl.hidden = !zoomPopoverEl.hidden;
-});
-btnZoomOut.addEventListener("click", () => setPageZoom(currentZoom - 10));
-btnZoomIn.addEventListener("click", () => setPageZoom(currentZoom + 10));
-btnZoomReset.addEventListener("click", () => setPageZoom(100));
-
-zoomPopoverEl.querySelectorAll("[data-viewport]").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    currentViewport = btn.dataset.viewport;
-    framesStageEl.setAttribute("data-viewport", currentViewport);
-    zoomPopoverEl.querySelectorAll("[data-viewport]").forEach((b) => {
-      b.classList.toggle("is-active", b === btn);
-    });
-    if (!devtoolsDockEl.hidden) renderDevTools();
-  });
+// Chrome 3-Dots Menu
+btnMoreMenu.addEventListener("click", (e) => {
+  e.stopPropagation();
+  chromeDropdownEl.hidden = !chromeDropdownEl.hidden;
 });
 
-selectUaEl.addEventListener("change", () => {
-  currentUserAgent = selectUaEl.value;
-  localStorage.setItem(STORAGE_KEYS.userAgent, currentUserAgent);
+document.addEventListener("click", () => {
+  chromeDropdownEl.hidden = true;
+});
+
+menuNewTab.addEventListener("click", () => createTab({ select: true }));
+menuDuplicateTab.addEventListener("click", () => {
   const active = getActiveTab();
-  if (active?.url && !active.showLaunchpad) {
-    void navigateTo(active.url, { pushHistory: false, tab: active });
+  if (active) {
+    createTab({
+      select: true,
+      url: active.url,
+      engine: active.engine || currentEngine,
+    });
   }
 });
+menuPinTab.addEventListener("click", () => {
+  const active = getActiveTab();
+  if (active) {
+    active.pinned = !active.pinned;
+    renderUI();
+  }
+});
+menuReopenClosed.addEventListener("click", () => reopenLastClosedTab());
+menuHistory.addEventListener("click", () => openHistoryDrawer());
+menuNotes.addEventListener("click", () => (notesDrawer.hidden = false));
+menuSnapshot.addEventListener("click", () => void exportSnapshotOrCopyLink());
+menuPopout.addEventListener("click", () => openPopoutWindow());
+menuCloak.addEventListener("click", () => openAboutBlankCloak());
+menuFullscreen.addEventListener("click", () =>
+  setFullscreenMode(!document.body.classList.contains("is-fullscreen"))
+);
+menuCommandPalette.addEventListener("click", () => openCommandPalette());
+menuDevtools.addEventListener("click", () => toggleDevTools());
+menuCustomize.addEventListener("click", () => (customizeModal.hidden = false));
 
-btnHistory.addEventListener("click", () => openHistoryDrawer());
+// History & Notes Drawers
 btnHistoryClose.addEventListener("click", () => (historyDrawer.hidden = true));
+historyDrawer.addEventListener("click", (e) => {
+  if (e.target === historyDrawer) historyDrawer.hidden = true;
+});
 historySearchInput.addEventListener("input", () =>
   renderHistoryList(historySearchInput.value)
 );
@@ -2206,10 +1962,10 @@ btnReopenClosed.addEventListener("click", () => {
   reopenLastClosedTab();
 });
 
-btnNotes.addEventListener("click", () => {
-  notesDrawer.hidden = !notesDrawer.hidden;
-});
 btnNotesClose.addEventListener("click", () => (notesDrawer.hidden = true));
+notesDrawer.addEventListener("click", (e) => {
+  if (e.target === notesDrawer) notesDrawer.hidden = true;
+});
 scratchpadTextarea.addEventListener("input", () => {
   localStorage.setItem(STORAGE_KEYS.notes, scratchpadTextarea.value);
 });
@@ -2219,12 +1975,11 @@ btnDownloadNotes.addEventListener("click", () => {
   });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `lucasprox-notes-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.download = `notes-${new Date().toISOString().slice(0, 10)}.txt`;
   a.click();
 });
 
-// DevTools Events
-btnDevtools.addEventListener("click", () => toggleDevTools());
+// Developer Console Dock
 btnDevClose.addEventListener("click", () => toggleDevTools());
 btnDevClear.addEventListener("click", () => {
   devNetworkLogs.length = 0;
@@ -2259,56 +2014,13 @@ devConsoleForm.addEventListener("submit", (e) => {
     if (win) {
       const result = win.eval(code);
       logConsoleEvent("log", String(result));
-    } else {
-      logConsoleEvent("warn", "No active proxy frame to evaluate in.");
     }
   } catch (err) {
     logConsoleEvent("error", String(err?.message || err));
   }
 });
 
-// Snapshot & Popout Mini-Window
-btnExportSnapshot.addEventListener("click", async () => {
-  const active = getActiveTab();
-  if (!active || !active.url) {
-    alert("Navigate to a website first to export an HTML snapshot.");
-    return;
-  }
-  try {
-    const docHtml =
-      active.iframe.contentDocument?.documentElement?.outerHTML ||
-      `<!-- Snapshot of ${active.url} via LucasProx -->`;
-    const blob = new Blob([docHtml], { type: "text/html;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${formatHostnameOrTitle(active.url)}-snapshot.html`;
-    a.click();
-  } catch {
-    // Copy shareable link fallback
-    const shareUrl = `${location.origin}/?url=${encodeURIComponent(
-      active.url
-    )}&engine=${encodeURIComponent(active.engine || currentEngine)}`;
-    await navigator.clipboard?.writeText(shareUrl).catch(() => {});
-    alert(`Shareable proxy link copied to clipboard:\n${shareUrl}`);
-  }
-});
-
-btnPopoutPip.addEventListener("click", () => {
-  const active = getActiveTab();
-  const target = active?.url
-    ? `${location.origin}/?url=${encodeURIComponent(active.url)}&engine=${
-        active.engine || currentEngine
-      }`
-    : location.href;
-  window.open(
-    target,
-    "LucasProxMini",
-    "width=480,height=680,menubar=no,toolbar=no,location=no,status=no"
-  );
-});
-
-// Command Palette Events
-btnCommandPalette.addEventListener("click", () => openCommandPalette());
+// Command Bar
 btnCpClose.addEventListener("click", () => (commandPaletteModal.hidden = true));
 commandPaletteModal.addEventListener("click", (e) => {
   if (e.target === commandPaletteModal) commandPaletteModal.hidden = true;
@@ -2325,7 +2037,7 @@ cpInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Customization Studio Events
+// Customize Modal
 btnCustomize.addEventListener("click", () => {
   customizeModal.hidden = false;
 });
@@ -2407,50 +2119,26 @@ inputPanicUrl.addEventListener("change", () => {
   localStorage.setItem(STORAGE_KEYS.panicUrl, inputPanicUrl.value.trim());
 });
 
-selectTransport.addEventListener("change", async () => {
-  const nextKind = selectTransport.value;
-  if (!TRANSPORT_PATHS[nextKind]) return;
-  currentTransportKind = nextKind;
-  localStorage.setItem(STORAGE_KEYS.transport, nextKind);
-  updateFooterMetadata();
-
-  if (scramjetController) {
-    statusTextEl.textContent = `Switching transport to ${nextKind.toUpperCase()}...`;
-    const newTransport = await createTransport(nextKind);
-    scramjetController.setTransport(newTransport);
-    updateStatusPillReady();
-  }
-});
-
 selectSearch.addEventListener("change", () => {
   currentSearchTemplate = selectSearch.value;
   localStorage.setItem(STORAGE_KEYS.searchEngine, currentSearchTemplate);
 });
 
-// Session JSON Export & Import
 btnExportSession.addEventListener("click", () => {
   const payload = {
-    version: "10X",
     exportedAt: new Date().toISOString(),
-    engine: currentEngine,
     theme: localStorage.getItem(STORAGE_KEYS.theme) || "midnight",
     bookmarks,
     shortcuts,
     history: historyEntries.slice(0, 50),
     notes: scratchpadTextarea.value || "",
-    openTabs: tabs.map((t) => ({
-      title: t.title,
-      url: t.url,
-      engine: t.engine,
-      pinned: t.pinned,
-    })),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
   });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `lucasprox-session-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `lucasprox-backup-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
 });
 
@@ -2481,9 +2169,8 @@ btnImportSession.addEventListener("click", () => {
         localStorage.setItem(STORAGE_KEYS.theme, data.theme);
       }
       applyCustomizationsFromStorage();
-      alert("Session imported successfully!");
     } catch {
-      alert("Invalid session JSON file.");
+      alert("Invalid backup file.");
     }
   });
   input.click();
@@ -2497,22 +2184,16 @@ btnClearData.addEventListener("click", async () => {
     scramjetController.cookieJar.clear();
     await scramjetController.persistCookies();
   }
-  btnClearData.textContent = "✓ Cache & Cookies Cleared!";
+  btnClearData.textContent = "✓ Cleared!";
   setTimeout(() => {
-    btnClearData.textContent = "🗑 Clear Proxy Cache & Cookies";
+    btnClearData.textContent = "Clear Browsing Data";
   }, 1500);
 });
-
-btnCloak.addEventListener("click", () => openAboutBlankCloak());
 
 function setFullscreenMode(enabled) {
   document.body.classList.toggle("is-fullscreen", enabled);
   btnExitFullscreen.hidden = !enabled;
 }
-
-btnFullscreen.addEventListener("click", () => {
-  setFullscreenMode(!document.body.classList.contains("is-fullscreen"));
-});
 
 btnExitFullscreen.addEventListener("click", () => {
   setFullscreenMode(false);
@@ -2526,6 +2207,10 @@ window.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "p") {
     e.preventDefault();
     openCommandPalette();
+  } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "t" && !e.shiftKey) {
+    e.preventDefault();
+    createTab({ select: true });
+    heroInput.focus();
   } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
     e.preventDefault();
     const active = getActiveTab();
@@ -2545,9 +2230,6 @@ window.addEventListener("keydown", (e) => {
   } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
     e.preventDefault();
     btnBookmarkStar.click();
-  } else if (e.key === "F12") {
-    e.preventDefault();
-    toggleDevTools();
   } else if (e.key === "F2" || (!isTyping && e.key === "`")) {
     e.preventDefault();
     triggerPanicRedirect();
@@ -2562,7 +2244,7 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-// Initialize Customizations, Bookmarks, Shortcuts & Initial Tab
+// Boot Initial State
 applyCustomizationsFromStorage();
 renderBookmarks();
 renderShortcuts();
@@ -2573,10 +2255,6 @@ void ensureEngineReady()
   .finally(() => {
     const params = new URLSearchParams(location.search);
     const initialUrl = params.get("url");
-    const initialEngine = params.get("engine");
-    if (initialEngine && ENGINE_LABELS[initialEngine]) {
-      setProxyEngine(initialEngine, { reloadCurrent: false });
-    }
     if (initialUrl) {
       window.history.replaceState({}, "", "/");
       void navigateTo(initialUrl);

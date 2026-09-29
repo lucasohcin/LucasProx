@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LucasProx — 10X Multi-Engine Stealth Web Proxy</title>
+    <title>LucasProx</title>
     <meta
       name="description"
-      content="LucasProx 10X: Next-generation web proxy powered by Scramjet 2.0, Ultraviolet, AeroStream, DirectEdge, and ReaderLite."
+      content="LucasProx — Fast, private, minimalist web browser."
     />
     <link
       id="page-favicon"
@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
@@ -29,78 +29,36 @@
     <div class="ambient-glow" id="ambient-bg" aria-hidden="true"></div>
 
     <div class="app-shell" id="app-shell">
-      <!-- Top Minimalist Browser Chrome -->
+      <!-- Google Chrome-Style Minimalist Top Bar -->
       <header class="chrome-bar">
+        <!-- Row 1: Tab Strip -->
         <div class="chrome-top">
-          <button
-            type="button"
-            class="brand-pill"
-            id="btn-brand"
-            title="Return to Launchpad"
-          >
-            <span class="brand-logo" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M13 2L4 14H11L10 22L20 10H13L13 2Z"
-                  fill="currentColor"
-                />
-              </svg>
-            </span>
-            <span class="brand-name">LucasProx</span>
-            <span class="brand-badge">10X</span>
-          </button>
-
           <div
             class="tab-strip"
             id="tab-strip"
             role="tablist"
-            aria-label="Open proxy tabs"
+            aria-label="Open tabs"
           ></div>
 
-          <div class="tab-actions-group">
-            <button
-              type="button"
-              class="icon-btn icon-btn--sm"
-              id="btn-new-tab"
-              title="New Tab (Ctrl+T)"
-              aria-label="New Tab"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M12 5V19M5 12H19"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                />
-              </svg>
-            </button>
-            <button
-              type="button"
-              class="icon-btn icon-btn--sm"
-              id="btn-duplicate-tab"
-              title="Duplicate Current Tab"
-              aria-label="Duplicate Tab"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/>
-                <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" stroke="currentColor" stroke-width="1.8"/>
-              </svg>
-            </button>
-            <button
-              type="button"
-              class="icon-btn icon-btn--sm"
-              id="btn-pin-tab"
-              title="Pin / Unpin Active Tab"
-              aria-label="Pin Tab"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M16 3L21 8L19 10L15 9L11 13L12 17L10 19L6 15L2 19L5 15L1 11L3 9L7 10L11 6L10 2L12 0L16 3Z" fill="currentColor"/>
-              </svg>
-            </button>
-          </div>
+          <button
+            type="button"
+            class="icon-btn icon-btn--sm"
+            id="btn-new-tab"
+            title="New Tab (Ctrl+T)"
+            aria-label="New Tab"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 5V19M5 12H19"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
 
           <div class="top-status-cluster">
-            <div class="ping-pill" id="ping-pill" title="Live Server Latency">
+            <div class="ping-pill" id="ping-pill" title="Connection Latency">
               <span class="ping-dot"></span>
               <span id="ping-text">-- ms</span>
             </div>
@@ -108,13 +66,14 @@
               type="button"
               class="panic-btn"
               id="btn-panic"
-              title="Panic Key (F2 or ` ) — Instantly redirect to safe classroom page"
+              title="Quick Exit (F2 or `)"
             >
-              🚨 Panic
+              Quick Exit
             </button>
           </div>
         </div>
 
+        <!-- Row 2: Chrome Navigation & Omnibox Bar -->
         <div class="chrome-nav">
           <div class="nav-controls">
             <button
@@ -157,7 +116,7 @@
               type="button"
               class="icon-btn"
               id="btn-reload"
-              title="Reload Tab"
+              title="Reload"
               aria-label="Reload"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
@@ -174,7 +133,7 @@
               type="button"
               class="icon-btn"
               id="btn-home"
-              title="Launchpad Home"
+              title="New Tab Home"
               aria-label="Home"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -189,99 +148,78 @@
             </button>
           </div>
 
-          <!-- Multi-Proxy Engine Switcher Pill -->
-          <div class="engine-switcher-wrap" title="Switch Active Proxy Engine">
-            <span class="engine-switcher-icon" aria-hidden="true">⚡</span>
-            <select id="select-engine" class="engine-select" aria-label="Select Proxy Engine">
-              <option value="scramjet">Scramjet 2.0 (Wasm)</option>
-              <option value="uv">Ultraviolet (UV XOR)</option>
-              <option value="aero">AeroStream (Stealth)</option>
-              <option value="direct">DirectEdge (Stream)</option>
-              <option value="reader">ReaderLite (Text)</option>
-              <option value="auto">Smart Auto-Switch</option>
-            </select>
-          </div>
-
-          <!-- Unified Omnibox with Autocomplete & Bookmark Star -->
+          <!-- Chrome-style Rounded Address Bar -->
           <div class="omnibox-container">
             <form class="omnibox" id="omnibox-form" autocomplete="off">
-              <span class="omnibox-shield" id="security-indicator" title="Encrypted Proxy Tunnel">
+              <span class="omnibox-shield" id="security-indicator" title="Private Connection">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M12 2L4 5.5V11.5C4 16.8 7.4 21.6 12 23C16.6 21.6 20 16.8 20 11.5V5.5L12 2Z"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linejoin="round"
-                  />
+                  <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
               </span>
               <input
                 type="text"
                 id="address-input"
                 class="omnibox-input"
-                placeholder="Search (!g, !yt, !w, !r) or enter any URL..."
+                placeholder="Search Google or type a URL"
                 spellcheck="false"
-                aria-label="Address and search bar"
+                aria-label="Search or type a URL"
               />
               <button
                 type="button"
                 class="omnibox-action-btn"
-                id="btn-bookmark-star"
-                title="Bookmark this page (Ctrl+D)"
-                aria-label="Bookmark page"
+                id="btn-reader-toggle"
+                title="Toggle Clean Reader View"
+                aria-label="Reader View"
               >
-                ☆
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
               </button>
               <button
                 type="button"
                 class="omnibox-action-btn"
-                id="btn-reader-toggle"
-                title="Toggle ReaderLite Mode on current page"
-                aria-label="Toggle Reader Mode"
+                id="btn-bookmark-star"
+                title="Bookmark this tab (Ctrl+D)"
+                aria-label="Bookmark page"
               >
-                📖
-              </button>
-              <button
-                type="submit"
-                class="omnibox-go"
-                title="Go"
-                aria-label="Navigate"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M5 12H19M19 12L13 6M19 12L13 18"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
+                ☆
               </button>
             </form>
             <div class="omnibox-suggestions" id="omnibox-suggestions" hidden></div>
           </div>
 
-          <!-- Right Feature Action Bar -->
+          <!-- Clean Minimal Right Controls -->
           <div class="utility-controls">
             <button
               type="button"
-              class="icon-btn badge-btn is-active"
+              class="switch-proxy-btn"
+              id="btn-switch-proxy"
+              title="Auto-selects the fastest working proxy. Click to switch proxy route if a site isn't loading."
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <path d="M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span id="proxy-route-label">Auto</span>
+            </button>
+
+            <button
+              type="button"
+              class="icon-btn is-active"
               id="btn-adblock"
-              title="Ad & Tracker Shield (Active)"
+              title="Ad & Tracker Blocker"
               aria-label="Toggle Adblocker"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z" stroke="currentColor" stroke-width="1.9"/>
-                <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-              <span class="mini-badge" id="adblock-count">0</span>
             </button>
 
             <button
               type="button"
               class="icon-btn"
               id="btn-split-view"
-              title="Split-Screen Dual View (Browse 2 tabs side-by-side)"
+              title="Split Screen (View 2 tabs side by side)"
               aria-label="Toggle Split Screen"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
@@ -290,183 +228,90 @@
               </svg>
             </button>
 
-            <button
-              type="button"
-              class="icon-btn"
-              id="btn-zoom-menu"
-              title="Zoom & Viewport Simulator"
-              aria-label="Zoom and Viewport"
-            >
-              <span class="zoom-label-btn" id="zoom-btn-text">100%</span>
-            </button>
+            <!-- Chrome 3-Dots More Menu -->
+            <div class="more-menu-wrap">
+              <button
+                type="button"
+                class="icon-btn"
+                id="btn-more-menu"
+                title="More Tools & Settings"
+                aria-label="More Tools"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="5" r="1.8" fill="currentColor"/>
+                  <circle cx="12" cy="12" r="1.8" fill="currentColor"/>
+                  <circle cx="12" cy="19" r="1.8" fill="currentColor"/>
+                </svg>
+              </button>
 
-            <button
-              type="button"
-              class="icon-btn"
-              id="btn-history"
-              title="Browsing History & Closed Tabs (Ctrl+H)"
-              aria-label="History"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.9"/>
-                <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
-              </svg>
-            </button>
-
-            <button
-              type="button"
-              class="icon-btn"
-              id="btn-notes"
-              title="Quick Scratchpad Notes"
-              aria-label="Scratchpad Notes"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.9"/>
-                <polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.9"/>
-              </svg>
-            </button>
-
-            <button
-              type="button"
-              class="icon-btn"
-              id="btn-devtools"
-              title="Built-in Proxy DevTools & Network Inspector (F12)"
-              aria-label="Toggle Proxy DevTools"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <polyline points="16 18 22 12 16 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-                <polyline points="8 6 2 12 8 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-
-            <button
-              type="button"
-              class="icon-btn"
-              id="btn-command-palette"
-              title="Command Palette (⌘P / Ctrl+P)"
-              aria-label="Command Palette"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.9"/>
-                <path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
-              </svg>
-            </button>
-
-            <button
-              type="button"
-              class="icon-btn"
-              id="btn-customize"
-              title="Customization Studio (Themes, Tab Cloak, Layout, Accent)"
-              aria-label="Customization Studio"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.9"/>
-                <circle cx="8.5" cy="10.5" r="1.4" fill="currentColor"/>
-                <circle cx="12" cy="7.5" r="1.4" fill="currentColor"/>
-                <circle cx="15.5" cy="10.5" r="1.4" fill="currentColor"/>
-                <path d="M12 21a3 3 0 0 0 3-3c0-1.5-1-2.5-1-3.5 0-1 1-1.5 2-1.5a4 4 0 0 0 4-4" stroke="currentColor" stroke-width="1.6"/>
-              </svg>
-            </button>
-
-            <button
-              type="button"
-              class="icon-btn"
-              id="btn-cloak"
-              title="Cloak in about:blank tab"
-              aria-label="Cloak in about:blank"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M2 12C4.5 7 8 4.5 12 4.5C16 4.5 19.5 7 22 12C19.5 17 16 19.5 12 19.5C8 19.5 4.5 17 2 12Z"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                />
-                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.9" />
-              </svg>
-            </button>
-
-            <button
-              type="button"
-              class="icon-btn"
-              id="btn-fullscreen"
-              title="Toggle Immersive Fullscreen"
-              aria-label="Toggle Fullscreen"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M8 3H5A2 2 0 0 0 3 5V8M16 3H19A2 2 0 0 1 21 5V8M8 21H5A2 2 0 0 1 3 19V16M16 21H19A2 2 0 0 0 21 19V16"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linecap="round"
-                />
-              </svg>
-            </button>
+              <!-- Clean Chrome Dropdown Menu -->
+              <div class="chrome-dropdown" id="chrome-dropdown" hidden>
+                <button type="button" class="dropdown-item" id="menu-new-tab">
+                  <span>New Tab</span>
+                  <kbd>⌘T</kbd>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-duplicate-tab">
+                  <span>Duplicate Tab</span>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-pin-tab">
+                  <span>Pin / Unpin Tab</span>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-reopen-closed">
+                  <span>Reopen Closed Tab</span>
+                  <kbd>⌘⇧T</kbd>
+                </button>
+                <div class="dropdown-divider"></div>
+                <button type="button" class="dropdown-item" id="menu-history">
+                  <span>History</span>
+                  <kbd>⌘H</kbd>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-notes">
+                  <span>Quick Notes</span>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-snapshot">
+                  <span>Save Page / Copy Link</span>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-popout">
+                  <span>Popout Mini Window</span>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-cloak">
+                  <span>Open in about:blank Cloak</span>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-fullscreen">
+                  <span>Fullscreen</span>
+                </button>
+                <div class="dropdown-divider"></div>
+                <button type="button" class="dropdown-item" id="menu-command-palette">
+                  <span>Command Bar</span>
+                  <kbd>⌘P</kbd>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-devtools">
+                  <span>Developer Console</span>
+                </button>
+                <button type="button" class="dropdown-item" id="menu-customize">
+                  <span>Customize &amp; Themes</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Bookmarks & Quick Tools Bar -->
+        <!-- Row 3: Clean Chrome Bookmarks Bar -->
         <div class="bookmarks-bar" id="bookmarks-bar">
           <div class="bookmarks-list" id="bookmarks-list"></div>
-          <div class="bookmarks-right">
-            <button type="button" class="micro-tool-btn" id="btn-export-snapshot" title="Download HTML Snapshot or Copy Shareable Link">
-              📥 Snapshot
-            </button>
-            <button type="button" class="micro-tool-btn" id="btn-popout-pip" title="Open Floating Mini-Browser Window">
-              ❐ Popout
-            </button>
-          </div>
-        </div>
-
-        <!-- Zoom & Viewport Popover Bar -->
-        <div class="zoom-popover" id="zoom-popover" hidden>
-          <div class="zoom-controls-group">
-            <span class="popover-label">Zoom</span>
-            <button type="button" class="mini-btn" id="btn-zoom-out">−</button>
-            <span id="zoom-value-display">100%</span>
-            <button type="button" class="mini-btn" id="btn-zoom-in">+</button>
-            <button type="button" class="mini-btn" id="btn-zoom-reset">Reset</button>
-          </div>
-          <div class="viewport-controls-group">
-            <span class="popover-label">Viewport</span>
-            <button type="button" class="mini-btn is-active" data-viewport="desktop">🖥 Desktop</button>
-            <button type="button" class="mini-btn" data-viewport="tablet">📱 Tablet</button>
-            <button type="button" class="mini-btn" data-viewport="mobile">📲 Mobile</button>
-          </div>
-          <div class="ua-controls-group">
-            <span class="popover-label">User-Agent</span>
-            <select id="select-ua" class="mini-select">
-              <option value="default">Default Browser</option>
-              <option value="chrome">Windows Chrome 131</option>
-              <option value="safari">macOS Safari 18</option>
-              <option value="iphone">iPhone iOS 18</option>
-              <option value="android">Android Pixel 8</option>
-              <option value="bot">Googlebot Crawler</option>
-            </select>
-          </div>
         </div>
 
         <div class="loading-bar" id="loading-bar" aria-hidden="true"></div>
       </header>
 
-      <!-- Main Viewport: Launchpad + Proxied Iframe Stage + Split Screen + DevTools -->
+      <!-- Main Viewport -->
       <main class="viewport" id="viewport">
-        <!-- New Tab Launchpad -->
-        <section class="launchpad" id="launchpad" aria-label="New Tab Launchpad">
+        <!-- Chill Google Chrome-Style New Tab Page -->
+        <section class="launchpad" id="launchpad" aria-label="New Tab">
           <div class="launchpad-inner">
-            <div class="status-pill" id="status-pill">
-              <span class="status-dot" id="status-dot"></span>
-              <span id="status-text">Initializing Multi-Proxy Engine...</span>
-            </div>
+            <h1 class="hero-title" id="btn-brand">Lucas<span>Prox</span></h1>
 
-            <h1 class="hero-title">Lucas<span>Prox</span></h1>
-            <p class="hero-subtitle">
-              10X Multi-Engine Web Proxy — Switch seamlessly between
-              <strong>Scramjet 2.0</strong>, <strong>Ultraviolet (UV)</strong>,
-              <strong>AeroStream</strong>, <strong>DirectEdge</strong> &amp;
-              <strong>ReaderLite</strong>.
-            </p>
-
-            <!-- Hero Search Box -->
+            <!-- Clean Chrome New Tab Search Box -->
             <form class="hero-search" id="hero-form" autocomplete="off">
               <svg
                 class="hero-search-icon"
@@ -494,85 +339,42 @@
                 type="text"
                 id="hero-input"
                 class="hero-search-input"
-                placeholder="Type any URL, search query, or bang (!g, !yt, !w, !r, !gh)..."
+                placeholder="Search the web or type a URL"
                 spellcheck="false"
                 autofocus
               />
-              <kbd class="hero-kbd" title="Press Ctrl+P for Command Palette">⌘P</kbd>
-              <button type="submit" class="hero-submit">Launch</button>
             </form>
 
-            <!-- Multi-Engine Quick Selector Cards -->
-            <div class="engine-pills-row" id="launchpad-engine-pills" aria-label="Quick Proxy Engine Switcher">
-              <button type="button" class="engine-chip is-active" data-engine="scramjet">
-                <span class="engine-chip__dot"></span>
-                <span>Scramjet 2.0</span>
-                <small>Wasm SW</small>
-              </button>
-              <button type="button" class="engine-chip" data-engine="uv">
-                <span class="engine-chip__dot"></span>
-                <span>Ultraviolet</span>
-                <small>UV XOR</small>
-              </button>
-              <button type="button" class="engine-chip" data-engine="aero">
-                <span class="engine-chip__dot"></span>
-                <span>AeroStream</span>
-                <small>Session</small>
-              </button>
-              <button type="button" class="engine-chip" data-engine="direct">
-                <span class="engine-chip__dot"></span>
-                <span>DirectEdge</span>
-                <small>Fast Stream</small>
-              </button>
-              <button type="button" class="engine-chip" data-engine="reader">
-                <span class="engine-chip__dot"></span>
-                <span>ReaderLite</span>
-                <small>Clean Text</small>
-              </button>
-              <button type="button" class="engine-chip" data-engine="auto">
-                <span class="engine-chip__dot"></span>
-                <span>Auto-Switch</span>
-                <small>Failover</small>
-              </button>
-            </div>
-
-            <!-- Customizable Quick Launch Grid -->
-            <div class="quick-section-header">
-              <span class="quick-section-title">Quick Launch Shortcuts</span>
-              <button type="button" class="micro-tool-btn" id="btn-add-shortcut">
-                + Add Custom Site
-              </button>
-            </div>
-            <div class="quick-grid" id="quick-grid" aria-label="Quick launch sites"></div>
-
-            <!-- Footer Info Strip -->
-            <div class="launchpad-footer">
-              <span id="footer-engine"><strong>Engine:</strong> Scramjet 2.0</span>
-              <span class="dot-sep">•</span>
-              <span id="footer-transport"><strong>Transport:</strong> Bare V3 HTTP</span>
-              <span class="dot-sep">•</span>
-              <span id="footer-isolation"><strong>Isolation:</strong> Checking...</span>
-              <span class="dot-sep">•</span>
-              <span id="footer-shield"><strong>AdShield:</strong> Active</span>
-            </div>
+            <!-- Chrome-Style Circular Shortcuts Grid -->
+            <div class="quick-grid" id="quick-grid" aria-label="Shortcuts"></div>
           </div>
+
+          <!-- Chrome-style Bottom-Right "Customize" Button -->
+          <button
+            type="button"
+            class="customize-fab"
+            id="btn-customize"
+            title="Customize LucasProx"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Customize</span>
+          </button>
         </section>
 
-        <!-- Proxied Iframe Stage (Supports Single + Split-Screen Dual View) -->
+        <!-- Proxied Iframe Stage -->
         <div class="frames-stage" id="frames-stage"></div>
 
-        <!-- Built-in Proxy DevTools & Inspector Dock -->
-        <aside class="devtools-dock" id="devtools-dock" hidden aria-label="Proxy DevTools">
+        <!-- Developer Console Dock (Hidden unless opened from menu) -->
+        <aside class="devtools-dock" id="devtools-dock" hidden aria-label="Console">
           <div class="devtools-header">
             <div class="devtools-tabs">
               <button type="button" class="devtools-tab is-active" data-devtab="network">
-                🌐 Network (<span id="dev-net-count">0</span>)
+                Network (<span id="dev-net-count">0</span>)
               </button>
               <button type="button" class="devtools-tab" data-devtab="console">
-                💻 Console (<span id="dev-console-count">0</span>)
-              </button>
-              <button type="button" class="devtools-tab" data-devtab="inspector">
-                🔍 Tunnel Inspector
+                Console (<span id="dev-console-count">0</span>)
               </button>
             </div>
             <div class="devtools-actions">
@@ -591,14 +393,11 @@
                 <input
                   type="text"
                   id="dev-console-input"
-                  placeholder="Run JavaScript in active proxy frame (e.g. document.title)..."
+                  placeholder="Run JavaScript in active tab..."
                   autocomplete="off"
                 />
                 <button type="submit" class="mini-btn">Run</button>
               </form>
-            </div>
-            <div class="devtools-pane" id="devpane-inspector">
-              <div class="inspector-grid" id="inspector-grid"></div>
             </div>
           </div>
         </aside>
@@ -618,14 +417,14 @@
 
     <!-- Command Palette Modal (Ctrl+P / Cmd+P) -->
     <div class="modal-backdrop" id="command-palette-modal" hidden>
-      <div class="command-palette" role="dialog" aria-label="Command Palette">
+      <div class="command-palette" role="dialog" aria-label="Command Bar">
         <div class="cp-search-row">
           <span class="cp-icon">⌘</span>
           <input
             type="text"
             id="cp-input"
             class="cp-input"
-            placeholder="Type a command, proxy engine, theme, or tab action..."
+            placeholder="Type a command or action..."
             autocomplete="off"
           />
           <kbd class="cp-esc" id="btn-cp-close">ESC</kbd>
@@ -634,59 +433,59 @@
       </div>
     </div>
 
-    <!-- Customization Studio & Settings Modal (5 Customization Suites + Engine Settings) -->
+    <!-- Customize Chrome-style Modal -->
     <div class="modal-backdrop" id="customize-modal" hidden>
-      <div class="studio-modal" role="dialog" aria-label="Customization Studio">
+      <div class="studio-modal" role="dialog" aria-label="Customize Browser">
         <div class="studio-header">
           <div>
-            <h2>🎨 LucasProx Customization Studio &amp; Settings</h2>
-            <p>Personalize themes, accent glow, tab cloaking, ambient backgrounds, layout density &amp; proxy transports.</p>
+            <h2>Customize LucasProx</h2>
+            <p>Personalize your theme, accent color, tab cloak, background, and layout.</p>
           </div>
-          <button type="button" class="icon-btn" id="btn-studio-close" aria-label="Close Studio">✕</button>
+          <button type="button" class="icon-btn" id="btn-studio-close" aria-label="Close">✕</button>
         </div>
 
         <div class="studio-body">
           <!-- 1. Theme Presets -->
           <div class="studio-section">
-            <h3>1. Theme Presets</h3>
+            <h3>1. Theme</h3>
             <div class="theme-grid" id="theme-grid">
               <button type="button" class="theme-card" data-theme-val="midnight">
                 <span class="theme-swatch" style="background:linear-gradient(135deg,#7c5cff,#39d0ff)"></span>
-                <span>Midnight Stealth</span>
+                <span>Midnight</span>
               </button>
               <button type="button" class="theme-card" data-theme-val="cyberpunk">
                 <span class="theme-swatch" style="background:linear-gradient(135deg,#ff2a85,#fcee09)"></span>
-                <span>Cyberpunk Neon</span>
+                <span>Cyberpunk</span>
               </button>
               <button type="button" class="theme-card" data-theme-val="nord">
                 <span class="theme-swatch" style="background:linear-gradient(135deg,#88c0d0,#5e81ac)"></span>
-                <span>Nordic Frost</span>
+                <span>Nord Frost</span>
               </button>
               <button type="button" class="theme-card" data-theme-val="dracula">
                 <span class="theme-swatch" style="background:linear-gradient(135deg,#bd93f9,#ff79c6)"></span>
-                <span>Dracula Pro</span>
+                <span>Dracula</span>
               </button>
               <button type="button" class="theme-card" data-theme-val="matrix">
                 <span class="theme-swatch" style="background:linear-gradient(135deg,#00ff88,#00b862)"></span>
-                <span>Emerald Matrix</span>
+                <span>Emerald</span>
               </button>
               <button type="button" class="theme-card" data-theme-val="synthwave">
                 <span class="theme-swatch" style="background:linear-gradient(135deg,#ff6b6b,#a855f7)"></span>
-                <span>Sunset Synth</span>
+                <span>Sunset</span>
               </button>
               <button type="button" class="theme-card" data-theme-val="oled">
                 <span class="theme-swatch" style="background:linear-gradient(135deg,#ffffff,#4b5563)"></span>
-                <span>OLED Pitch Black</span>
+                <span>OLED Black</span>
               </button>
             </div>
           </div>
 
-          <!-- 2. Custom Accent Color & Glow Intensity -->
+          <!-- 2. Custom Accent Color & Glow -->
           <div class="studio-section">
-            <h3>2. Custom Accent Color &amp; Glow Intensity</h3>
+            <h3>2. Accent Color &amp; Ambient Glow</h3>
             <div class="studio-row-grid">
               <label class="studio-field">
-                <span>Primary Accent Color</span>
+                <span>Accent Color</span>
                 <div class="color-picker-wrap">
                   <input type="color" id="input-accent-color" value="#7c5cff" />
                   <code id="accent-hex-label">#7c5cff</code>
@@ -694,47 +493,47 @@
                 </div>
               </label>
               <label class="studio-field">
-                <span>Ambient Glow Intensity (<strong id="glow-val-label">100%</strong>)</span>
+                <span>Background Glow (<strong id="glow-val-label">100%</strong>)</span>
                 <input type="range" id="input-glow-intensity" min="0" max="150" value="100" />
               </label>
             </div>
           </div>
 
-          <!-- 3. Tab Disguise & Cloak Studio -->
+          <!-- 3. Tab Disguise & Cloak -->
           <div class="studio-section">
-            <h3>3. Tab Cloak &amp; Disguise Presets</h3>
+            <h3>3. Tab Disguise (Cloak)</h3>
             <div class="cloak-presets-row" id="cloak-presets">
-              <button type="button" class="mini-btn" data-cloak="default">⚡ LucasProx</button>
-              <button type="button" class="mini-btn" data-cloak="docs">📄 Google Docs</button>
-              <button type="button" class="mini-btn" data-cloak="drive">📁 Google Drive</button>
-              <button type="button" class="mini-btn" data-cloak="classroom">🎓 Google Classroom</button>
-              <button type="button" class="mini-btn" data-cloak="canvas">🧭 Canvas LMS</button>
-              <button type="button" class="mini-btn" data-cloak="wikipedia">🌐 Wikipedia</button>
+              <button type="button" class="mini-btn" data-cloak="default">Default</button>
+              <button type="button" class="mini-btn" data-cloak="docs">Google Docs</button>
+              <button type="button" class="mini-btn" data-cloak="drive">Google Drive</button>
+              <button type="button" class="mini-btn" data-cloak="classroom">Google Classroom</button>
+              <button type="button" class="mini-btn" data-cloak="canvas">Canvas</button>
+              <button type="button" class="mini-btn" data-cloak="wikipedia">Wikipedia</button>
             </div>
             <div class="studio-row-grid" style="margin-top:10px;">
               <label class="studio-field">
                 <span>Custom Tab Title</span>
-                <input type="text" id="input-custom-title" class="studio-input" placeholder="e.g. AP Calculus Notes - Google Docs" />
+                <input type="text" id="input-custom-title" class="studio-input" placeholder="e.g. Google Docs" />
               </label>
               <label class="studio-field">
-                <span>Custom Favicon URL</span>
+                <span>Custom Tab Icon URL</span>
                 <input type="text" id="input-custom-favicon" class="studio-input" placeholder="https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" />
               </label>
             </div>
           </div>
 
-          <!-- 4. Launchpad Background & Ambient Effect -->
+          <!-- 4. Wallpaper & Ambient Style -->
           <div class="studio-section">
-            <h3>4. Background Wallpaper &amp; Ambient Effect</h3>
+            <h3>4. New Tab Wallpaper</h3>
             <div class="studio-row-grid">
               <label class="studio-field">
-                <span>Backdrop Style</span>
+                <span>Background Style</span>
                 <select id="select-bg-style" class="studio-select">
-                  <option value="aurora">Aurora Radial Glow</option>
-                  <option value="grid">Cyber Perspective Grid</option>
-                  <option value="stars">Deep Space Starfield</option>
-                  <option value="minimal">Minimal Flat Matte</option>
-                  <option value="custom">Custom Wallpaper URL</option>
+                  <option value="aurora">Soft Aurora Glow</option>
+                  <option value="grid">Subtle Grid</option>
+                  <option value="stars">Starfield</option>
+                  <option value="minimal">Minimal Clean</option>
+                  <option value="custom">Custom Wallpaper Image</option>
                 </select>
               </label>
               <label class="studio-field">
@@ -744,101 +543,90 @@
             </div>
           </div>
 
-          <!-- 5. UI Layout, Density, Typography & Proxy Engine Config -->
+          <!-- 5. Layout, Search & Privacy -->
           <div class="studio-section">
-            <h3>5. UI Layout, Typography &amp; Proxy Engine Config</h3>
+            <h3>5. Layout &amp; Browsing Preferences</h3>
             <div class="studio-row-grid">
               <label class="studio-field">
                 <span>Toolbar Density</span>
                 <select id="select-density" class="studio-select">
-                  <option value="comfortable">Comfortable (Default)</option>
+                  <option value="comfortable">Standard Chrome</option>
                   <option value="compact">Compact Slim</option>
                 </select>
               </label>
               <label class="studio-field">
-                <span>UI Typography</span>
+                <span>Font Style</span>
                 <select id="select-font" class="studio-select">
-                  <option value="sans">Inter Modern Sans</option>
-                  <option value="mono">JetBrains Mono (Hacker)</option>
-                  <option value="system">System Native UI</option>
+                  <option value="sans">Inter Sans</option>
+                  <option value="system">System Default</option>
+                  <option value="mono">Monospace</option>
                 </select>
               </label>
               <label class="studio-field">
                 <span>Bookmarks Bar</span>
                 <select id="select-bookmarks-bar" class="studio-select">
-                  <option value="show">Always Show</option>
-                  <option value="hide">Hidden</option>
+                  <option value="show">Show Bookmarks Bar</option>
+                  <option value="hide">Hide Bookmarks Bar</option>
                 </select>
               </label>
               <label class="studio-field">
-                <span>Panic Button Redirect URL (F2 / `)</span>
-                <input type="text" id="input-panic-url" class="studio-input" value="https://classroom.google.com" />
-              </label>
-              <label class="studio-field">
-                <span>Scramjet Low-Level Transport</span>
-                <select id="select-transport" class="studio-select">
-                  <option value="bare">Bare V3 HTTP (Vercel/Netlify Ready)</option>
-                  <option value="epoxy">Epoxy TLS (Wasm over Wisp)</option>
-                  <option value="libcurl">Libcurl.js (TLS over Wisp)</option>
-                </select>
-              </label>
-              <label class="studio-field">
-                <span>Default Search Engine</span>
+                <span>Search Engine</span>
                 <select id="select-search" class="studio-select">
                   <option value="https://duckduckgo.com/?q=%s">DuckDuckGo</option>
-                  <option value="https://search.brave.com/search?q=%s">Brave Search</option>
                   <option value="https://www.google.com/search?q=%s">Google</option>
+                  <option value="https://search.brave.com/search?q=%s">Brave Search</option>
                   <option value="https://www.bing.com/search?q=%s">Bing</option>
-                  <option value="https://en.wikipedia.org/w/index.php?search=%s">Wikipedia</option>
                 </select>
+              </label>
+              <label class="studio-field">
+                <span>Quick Exit Redirect URL (F2 or `)</span>
+                <input type="text" id="input-panic-url" class="studio-input" value="https://classroom.google.com" />
               </label>
             </div>
 
             <div class="studio-footer-actions">
-              <button type="button" class="mini-btn" id="btn-export-session">📤 Export Session JSON</button>
-              <button type="button" class="mini-btn" id="btn-import-session">📥 Import Session JSON</button>
-              <button type="button" class="danger-btn" id="btn-clear-data">🗑 Clear Proxy Cache &amp; Cookies</button>
+              <button type="button" class="mini-btn" id="btn-export-session">Export Backup</button>
+              <button type="button" class="mini-btn" id="btn-import-session">Import Backup</button>
+              <button type="button" class="danger-btn" id="btn-clear-data">Clear Browsing Data</button>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- History & Session Drawer -->
+    <!-- History Drawer -->
     <div class="drawer-backdrop" id="history-drawer" hidden>
-      <aside class="side-drawer" aria-label="Browsing History">
+      <aside class="side-drawer" aria-label="History">
         <div class="drawer-header">
-          <h3>🕒 Browsing History</h3>
+          <h3>History</h3>
           <div class="drawer-header-btns">
-            <button type="button" class="mini-btn" id="btn-reopen-closed" title="Reopen Last Closed Tab (Ctrl+Shift+T)">
-              ↩ Reopen Closed
-            </button>
+            <button type="button" class="mini-btn" id="btn-reopen-closed">Reopen Closed</button>
             <button type="button" class="mini-btn" id="btn-clear-history">Clear</button>
             <button type="button" class="icon-btn icon-btn--sm" id="btn-history-close">✕</button>
           </div>
         </div>
         <div class="drawer-search">
-          <input type="text" id="history-search-input" class="studio-input" placeholder="Filter history..." />
+          <input type="text" id="history-search-input" class="studio-input" placeholder="Search history..." />
         </div>
         <div class="drawer-list" id="history-list"></div>
       </aside>
     </div>
 
-    <!-- Scratchpad Notes Drawer -->
+    <!-- Notes Drawer -->
     <div class="drawer-backdrop" id="notes-drawer" hidden>
-      <aside class="side-drawer" aria-label="Scratchpad Notes">
+      <aside class="side-drawer" aria-label="Quick Notes">
         <div class="drawer-header">
-          <h3>📝 Quick Scratchpad</h3>
+          <h3>Quick Notes</h3>
           <div class="drawer-header-btns">
             <button type="button" class="mini-btn" id="btn-download-notes">Save .txt</button>
             <button type="button" class="icon-btn icon-btn--sm" id="btn-notes-close">✕</button>
           </div>
         </div>
-        <p class="drawer-hint">Notes are saved locally in your browser and never leave your device.</p>
+        <p class="drawer-hint">Saved automatically in your browser.</p>
         <textarea
           id="scratchpad-textarea"
           class="scratchpad-textarea"
-          placeholder="Jot down links, research notes, or snippets while browsing..."
+          placeholder="Write notes or save links here..."
         ></textarea>
       </aside>
     </div>
