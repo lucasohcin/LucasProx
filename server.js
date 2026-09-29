@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import vercelBareHandler from "./api/bare.js";
+import proxyHandler from "./api/proxy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "public");
@@ -22,19 +23,32 @@ app.all(["/bare", "/bare/*", "/api/bare", "/api/bare/*"], (req, res) => {
   void vercelBareHandler(req, res);
 });
 
-// Health & proxy metadata endpoint
+// Route Multi-Proxy Engine requests (Ultraviolet /service/uv/*, AeroStream, DirectEdge, ReaderLite)
+app.all(["/api/proxy", "/api/proxy/*", "/service/uv/*"], (req, res) => {
+  void proxyHandler(req, res);
+});
+
+// Health, latency ping & proxy metadata endpoint
 app.get("/api/status", (_req, res) => {
   res.json({
-    name: "LucasProx",
-    engine: "Scramjet 2.0",
+    name: "LucasProx 10X",
+    engines: [
+      { id: "scramjet", name: "Scramjet 2.0 (Wasm SW)" },
+      { id: "uv", name: "Ultraviolet (UV XOR)" },
+      { id: "aero", name: "AeroStream (Session Rewriter)" },
+      { id: "direct", name: "DirectEdge (Fast Stream)" },
+      { id: "reader", name: "ReaderLite (Text Mode)" },
+      { id: "auto", name: "Auto-Switch (Smart Failover)" },
+    ],
     wisp: "/wisp/",
-    bare: "/bare/",
+    bare: "/api/bare",
     transports: ["bare", "epoxy", "libcurl"],
+    timestamp: Date.now(),
     status: "online",
   });
 });
 
-// Serve static files from public/ (includes /scram, /controller, /utils, /baremod, etc. copied by npm run build)
+// Serve static files from public/ (includes /scram, /controller, /utils, /baremod, /uv, etc.)
 app.use(express.static(publicDir));
 
 // SPA fallback to index.html
@@ -69,7 +83,7 @@ if (!process.env.VERCEL) {
     .catch(() => {});
 
   server.listen(PORT, () => {
-    console.log(`\n  ⚡ LucasProx (Scramjet 2.0 + Bare/Wisp) is running!`);
+    console.log(`\n  ⚡ LucasProx 10X (Multi-Proxy: Scramjet 2.0 + Ultraviolet + AeroStream + DirectEdge) is running!`);
     console.log(`  ➜ Local:   http://localhost:${PORT}\n`);
   });
 }

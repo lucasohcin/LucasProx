@@ -63,9 +63,18 @@ class SafeSwResponse extends NativeResponse {
 
 self.Response = SafeSwResponse;
 
+importScripts("/uv/uv.config.js");
 importScripts("/controller/controller.sw.js");
 
 self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  // Let Ultraviolet (/service/uv/*) and server proxy (/api/proxy) requests pass directly to the backend handler
+  if (
+    url.origin === self.location.origin &&
+    (url.pathname.startsWith("/service/uv/") || url.pathname.startsWith("/api/proxy"))
+  ) {
+    return;
+  }
   if ($scramjetController.shouldRoute(event)) {
     event.respondWith($scramjetController.route(event));
   }
