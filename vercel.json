@@ -8,5 +8,15 @@
     "api/*.js": {
       "includeFiles": "public/**"
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/service/uv/:path*",
+      "destination": "/api/proxy?q=:path*"
+    },
+    {
+      "source": "/bare/:path*",
+      "destination": "/api/bare"
+    }
+  ]
 }

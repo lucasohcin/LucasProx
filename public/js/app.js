@@ -1147,26 +1147,35 @@ function createPageLifecyclePlugin(onTitle, onReady, onError) {
   return new PageLifecyclePlugin();
 }
 
+function xorEncodeUrl(str) {
+  if (!str) return "";
+  if (typeof globalThis.__uv$config?.encodeUrl === "function") {
+    return globalThis.__uv$config.encodeUrl(str);
+  }
+  return encodeURIComponent(
+    String(str)
+      .split("")
+      .map((char, ind) =>
+        ind % 2 ? String.fromCharCode(char.charCodeAt(0) ^ 2) : char
+      )
+      .join("")
+  );
+}
+
 function buildServerEngineIframeSrc(targetUrl, engineKind) {
   if (engineKind === "embed") {
     return targetUrl;
   }
 
   const params = new URLSearchParams();
+  params.set("q", xorEncodeUrl(targetUrl));
+  if (engineKind && engineKind !== "uv" && engineKind !== "auto") {
+    params.set("engine", engineKind);
+  }
   if (adblockEnabled) {
     params.set("adblock", "1");
   }
 
-  if (engineKind === "uv") {
-    const encoded =
-      globalThis.__uv$config?.encodeUrl?.(targetUrl) ||
-      encodeURIComponent(targetUrl);
-    const qs = params.toString() ? `?${params.toString()}` : "";
-    return `/service/uv/${encoded}${qs}`;
-  }
-
-  params.set("engine", engineKind === "auto" ? "uv" : engineKind);
-  params.set("url", targetUrl);
   return `/api/proxy?${params.toString()}`;
 }
 
@@ -1884,11 +1893,8 @@ async function navigateTo(
     return;
   }
 
-  // Use Scramjet Wasm Service Worker when Proxy 1 is selected or in Auto mode for heavy AST-virtualized apps (Xbox, Discord, etc.)
-  if (
-    engineToUse === "scramjet" ||
-    (engineToUse === "auto" && shouldUseWasmInAuto(targetUrl))
-  ) {
+  // Use Scramjet Wasm Service Worker only when Proxy 1 (scramjet) is explicitly selected
+  if (engineToUse === "scramjet") {
     try {
       const sjFrame = await Promise.race([
         ensureTabScramjetFrame(targetTab),

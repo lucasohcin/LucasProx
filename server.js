@@ -59,6 +59,11 @@ function extractProxiedOrigin(req) {
     try {
       const refUrl = new URL(referer);
       if (refUrl.pathname.startsWith("/api/proxy")) {
+        const qParam = refUrl.searchParams.get("q");
+        if (qParam) {
+          const decoded = uvDecode(qParam);
+          if (decoded) return new URL(decoded).origin;
+        }
         const rawTarget = refUrl.searchParams.get("url");
         if (rawTarget) return new URL(rawTarget).origin;
       } else if (refUrl.pathname.startsWith("/service/uv/")) {
